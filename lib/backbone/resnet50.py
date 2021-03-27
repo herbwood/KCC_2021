@@ -1,8 +1,11 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import sys
+from typing import List
 
-from ..layers.batch_norm import FrozenBatchNorm2d
+sys.path.insert(0, 'lib')
+from layers.batch_norm import FrozenBatchNorm2d
 
 class Bottleneck(nn.Module):
     def __init__(self, 
@@ -51,7 +54,7 @@ class Bottleneck(nn.Module):
 class ResNet50(nn.Module):
     def __init__(self, 
                  freeze_at : int, 
-                 has_bias : bool = False):
+                 has_bias : bool = False) -> List:
         super(ResNet50, self).__init__()
 
         self.has_bias = has_bias
@@ -126,3 +129,10 @@ class ResNet50(nn.Module):
         outputs.append(x)
 
         return outputs
+
+if __name__ == "__main__":
+    input = torch.randn((1, 3, 64, 64))
+    model = ResNet50(2, False)
+    output = model(input)
+
+    print(output[0].shape)

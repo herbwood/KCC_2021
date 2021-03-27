@@ -1,8 +1,10 @@
 import math
+import sys
 
 import torch
 from torch import nn
 import torch.nn.functional as F
+from resnet50 import ResNet50
 
 class FPN(nn.Module):
     """
@@ -80,3 +82,16 @@ class FPN(nn.Module):
             results.insert(0, p7)
 
         return results
+
+if __name__ == "__main__":
+
+    resnet50 = ResNet50(2, False)
+    FPN = FPN(resnet50, 2, 6)
+
+    input = torch.randn((1, 3, 64, 64))
+    output = FPN(input)
+
+    print(len(output))
+    
+    for feature_map in output:
+        print(feature_map.shape)
