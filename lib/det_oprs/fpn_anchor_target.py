@@ -38,7 +38,7 @@ def fpn_anchor_target_opr_core_impl(gt_boxes, im_info, anchors, allow_low_qualit
     ignore_label = config.ignore_label
 
     # get the gt boxes
-    valid_gt_boxes = gt_boxes[:int(im_info[5]), :]
+    valid_gt_boxes = gt_boxes[:int(im_info[5]), :] # get all the gtboxes
     valid_gt_boxes = valid_gt_boxes[valid_gt_boxes[:, -1].gt(0)]
 
     # compute the iou matrix
@@ -96,7 +96,7 @@ def fpn_anchor_target(boxes, im_info, all_anchors_list):
         batch_bbox_targets_list = []
 
         for i in range(len(all_anchors_list)):
-            anchors_perlvl = all_anchors_list[i]
+            anchors_perlvl = all_anchors_list[i]  # shape : [-1, 4]
             rpn_labels_perlvl, rpn_bbox_targets_perlvl = fpn_anchor_target_opr_core_impl(
                 boxes[bid], im_info[bid], anchors_perlvl)
 

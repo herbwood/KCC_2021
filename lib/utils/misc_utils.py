@@ -6,7 +6,7 @@ from typing import List
 
 def load_img(image_path):
     
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
 
     return img
 
@@ -106,6 +106,8 @@ def load_gt(dict_input,
             key_box : str, 
             class_names : List[str]):
     """
+    gtboxes = misc_utils.load_gt(record, 'gtboxes', 'fbox', self.config.class_names)
+
     Output 
     [[ 72. 202. 163. 503.   1.]
     [199. 180. 144. 499.   1.]
@@ -114,7 +116,6 @@ def load_gt(dict_input,
     [429. 171. 224. 511.   1.]
     [543. 178. 262. 570.   1.]]
     """
-
 
     assert key_name in dict_input
 
@@ -135,6 +136,7 @@ def load_gt(dict_input,
                 if rb['extra']['ignore'] != 0:
                     tag = -1
         bbox.append(np.hstack((rb[key_box], tag)))
+
     bboxes = np.vstack(bbox).astype(np.float64)
 
 

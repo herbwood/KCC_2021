@@ -2,9 +2,12 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import numpy as np
+import sys
+
+sys.path.insert(0, 'lib')
 
 from config import config
-from det_oprs.anchors_generator import AnchorGenerator
+from det_oprs.anchor_generator import AnchorGenerator
 from det_oprs.find_top_rpn_proposals import find_top_rpn_proposals
 from det_oprs.fpn_anchor_target import fpn_anchor_target, fpn_rpn_reshape
 from det_oprs.loss_opr import softmax_loss, smooth_l1_loss
@@ -51,6 +54,7 @@ class RPN(nn.Module):
             all_anchors_list.append(layer_anchors)
 
         # sample from the predictions
+        # rpn_rois shape : [2000, 5]
         rpn_rois = find_top_rpn_proposals(
                 self.training, pred_bbox_offsets_list, pred_cls_score_list,
                 all_anchors_list, im_info)
@@ -83,7 +87,7 @@ class RPN(nn.Module):
             loss_dict = {}
             loss_dict['loss_rpn_cls'] = loss_rpn_cls
             loss_dict['loss_rpn_loc'] = loss_rpn_loc
-            
+
             return rpn_rois, loss_dict
         else:
             return rpn_rois

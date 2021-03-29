@@ -135,4 +135,4 @@ if __name__ == "__main__":
     model = ResNet50(2, False)
     output = model(input)
 
-    print(output[0].shape)
+    

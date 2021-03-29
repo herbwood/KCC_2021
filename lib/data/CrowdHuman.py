@@ -4,8 +4,11 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 from typing import Dict, List, Tuple
+import sys
 
-from ..utils import misc_utils
+sys.path.insert(0, 'lib')
+
+from utils import misc_utils
 
 class CrowdHuman(Dataset):
 
@@ -45,7 +48,8 @@ class CrowdHuman(Dataset):
             if_flap = False
 
         # image
-        image_path = os.path.join(self.config.image_folder, record['ID']+'.png')
+        image_path = os.path.join(self.config.image_folder, record['ID']+'.jpg')
+
         image = misc_utils.load_img(image_path)
         image_h = image.shape[0]
         image_w = image.shape[1]
@@ -54,18 +58,22 @@ class CrowdHuman(Dataset):
             image = cv2.flip(image, 1)
 
         if self.training:
-            # ground_truth
-            gtboxes = misc_utils.load_gt(record, 'gtboxes', 'fbox', self.config.class_names)                             
+            # ground_truth 
+            gtboxes = misc_utils.load_gt(record, 'gtboxes', 'fbox', self.config.class_names)                           
             keep : List[bool] = (gtboxes[:, 2]>=0) * (gtboxes[:, 3]>=0)
-            gtboxes=gtboxes[keep, :]
+            gtboxes = gtboxes[keep, :]
             gtboxes[:, 2:4] += gtboxes[:, :2] # xywh -> x1y1x2y2
+            
 
             if if_flap:
                 gtboxes = flip_boxes(gtboxes, image_w)
-            # im_info
+            
             nr_gtboxes = gtboxes.shape[0]
             im_info = np.array([0, 0, 1, image_h, image_w, nr_gtboxes])
 
+            # image
+            # gtboxes : [x, y, w, h, tag]
+            # im_info : [0, 0, 1, h, w, number of gtboxes]
             return image, gtboxes, im_info
 
         else:

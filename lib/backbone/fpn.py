@@ -1,10 +1,12 @@
 import math
 import sys
 
+sys.path.insert(0, 'lib')
+
 import torch
 from torch import nn
 import torch.nn.functional as F
-from resnet50 import ResNet50
+from .resnet50 import ResNet50
 
 class FPN(nn.Module):
     """
@@ -31,6 +33,7 @@ class FPN(nn.Module):
             lateral_conv = nn.Conv2d(in_channels, fpn_dim, kernel_size=1)
             output_conv = nn.Conv2d(fpn_dim, fpn_dim, kernel_size=3, stride=1, padding=1)
 
+            # normalization
             nn.init.kaiming_normal_(lateral_conv.weight, mode='fan_out')
             nn.init.constant_(lateral_conv.bias, 0)
             nn.init.kaiming_normal_(output_conv.weight, mode='fan_out')
@@ -56,6 +59,7 @@ class FPN(nn.Module):
     def forward(self, x):
 
         bottom_up_features = self.bottom_up(x)
+
         bottom_up_features = bottom_up_features[self.output_b - 2:]
         bottom_up_features = bottom_up_features[::-1]
 
@@ -64,8 +68,7 @@ class FPN(nn.Module):
         prev_features = self.lateral_convs[0](bottom_up_features[0])
         results.append(self.output_convs[0](prev_features))
 
-        for l_id, (features, lateral_conv, output_conv) in enumerate(zip(
-            bottom_up_features[1:], self.lateral_convs[1:], self.output_convs[1:])):
+        for l_id, (features, lateral_conv, output_conv) in enumerate(zip(bottom_up_features[1:], self.lateral_convs[1:], self.output_convs[1:])):
             top_down_features = F.interpolate(prev_features, scale_factor=2, mode="bilinear", align_corners=False)
             lateral_features = lateral_conv(features)
             prev_features = lateral_features + top_down_features
