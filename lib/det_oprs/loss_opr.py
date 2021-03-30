@@ -53,7 +53,7 @@ def emd_loss_softmax(p_b0, p_s0, p_b1, p_s1, targets, labels):
     # pred_delta shape 
     # torch.Size([512, 8]), torch.Size([512, 8])
     # torch.Size([512, 16])
-    # torch.Size([2048, 4])
+    # torch.Size([1024, 8])
     pred_delta = torch.cat([p_b0, p_b1], axis=1).reshape(-1, p_b0.shape[-1])
 
     # pred_score shape
