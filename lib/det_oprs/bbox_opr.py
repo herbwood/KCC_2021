@@ -109,33 +109,42 @@ def box_overlap_opr(box, gt):
 
 def box_overlap_ignore_opr(box, gt, ignore_label=-1):
 
+    # box shape : [N, 4]
+    # gt shape : [M, 5]
+    # width_height shape : [N, M, 2]
+    # inter shape : [N, M] => iou values per anchor boxes with ground truth
+
     assert box.ndim == 2
     assert gt.ndim == 2
     assert gt.shape[-1] > 4
 
     area_box = (box[:, 2] - box[:, 0] + 1) * (box[:, 3] - box[:, 1] + 1)
     area_gt = (gt[:, 2] - gt[:, 0] + 1) * (gt[:, 3] - gt[:, 1] + 1)
-    width_height = torch.min(box[:, None, 2:], gt[:, 2:4]) - torch.max(
-        box[:, None, :2], gt[:, :2])  # [N,M,2]
+
+    width_height = torch.min(box[:, None, 2:], gt[:, 2:4]) - torch.max(box[:, None, :2], gt[:, :2])  # [N,M,2]
     width_height.clamp_(min=0)  # [N,M,2]
+
     inter = width_height.prod(dim=2)  # [N,M]
 
     del width_height
 
     # handle empty boxes
-    iou = torch.where(
-        inter > 0,
-        inter / (area_box[:, None] + area_gt - inter),
+    # if inter region is >0 return IoU else return 0
+    iou = torch.where(inter > 0, 
+        inter / (area_box[:, None] + area_gt - inter), 
         torch.zeros(1, dtype=inter.dtype, device=inter.device))
 
     ioa = torch.where(
         inter > 0,
         inter / (area_box[:, None]),
         torch.zeros(1, dtype=inter.dtype, device=inter.device))
-        
+    
+    # return True if label is -1 else False
     gt_ignore_mask = gt[:, 4].eq(ignore_label).repeat(box.shape[0], 1)
 
     iou *= ~gt_ignore_mask
     ioa *= gt_ignore_mask
-    
+
+    # iou shape : [N, M]
+    # ioa shape : [N, M]
     return iou, ioa

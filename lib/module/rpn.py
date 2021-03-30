@@ -97,7 +97,7 @@ class RPN(nn.Module):
             loss_dict = {}
             loss_dict['loss_rpn_cls'] = loss_rpn_cls
             loss_dict['loss_rpn_loc'] = loss_rpn_loc
-
+            
             return rpn_rois, loss_dict
         else:
             return rpn_rois

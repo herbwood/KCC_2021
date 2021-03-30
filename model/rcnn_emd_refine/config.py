@@ -15,18 +15,15 @@ class Crowd_human:
     class_names = ['background', 'person']
     num_classes = len(class_names)
     root_folder = '/data/CrowdHuman'
-    # image_folder = '/data/CrowdHuman/images'
-    image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\test\test_data\image'
-    
-    # train_source = os.path.join('/data/CrowdHuman/annotation_train.odgt')
-    train_source = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\test\test_data\test_annotation.odgt'
-    eval_source = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\test\test_data\test_annotation.odgt'
+    image_folder = '/data/CrowdHuman/images'
+    train_source = os.path.join('/data/CrowdHuman/annotation_train.odgt')
+    eval_source = os.path.join('/data/CrowdHuman/annotation_val.odgt')
 
 class Config:
     output_dir = 'outputs'
     model_dir = os.path.join(output_dir, 'model_dump')
     eval_dir = os.path.join(output_dir, 'eval_dump')
-    init_weights = '/datamodel/resnet50_fbaug.pth'
+    init_weights = '/data/model/resnet50_fbaug.pth'
 
     # ----------data config---------- #
     image_mean = np.array([103.530, 116.280, 123.675])
@@ -49,7 +46,7 @@ class Config:
     backbone_freeze_at = 2
     rpn_channel = 256
     
-    train_batch_per_gpu = 1
+    train_batch_per_gpu = 2
     momentum = 0.9
     weight_decay = 1e-4
     base_lr = 1e-3 * 1.25

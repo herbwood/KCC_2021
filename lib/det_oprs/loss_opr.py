@@ -36,23 +36,49 @@ def smooth_l1_loss(pred, target, beta: float):
 
 
 def emd_loss_softmax(p_b0, p_s0, p_b1, p_s1, targets, labels):
+    """
+    Input example 
+
+    p_b0 : Refined Box A loc feature map : torch.Size([512, 8])
+    p_s0 : Refined Box A cls feature map : torch.Size([512, 2])
+    p_b1 : Refined Box B loc feature map : torch.Size([512, 8])
+    p_s1 : Refined Box B cls feature map : torch.Size([512, 2])
+    
+    targets : torch.Size([512, 8])
+    labels : torch.Size([512, 2])
+    """
 
     # reshape
+    
+    # pred_delta shape 
+    # torch.Size([512, 8]), torch.Size([512, 8])
+    # torch.Size([512, 16])
+    # torch.Size([2048, 4])
     pred_delta = torch.cat([p_b0, p_b1], axis=1).reshape(-1, p_b0.shape[-1])
+
+    # pred_score shape
+    # torch.Size([512, 2]), torch.Size([512, 2])
+    # torch.Size([512, 4])
+    # torch.Size([1024, 2])
     pred_score = torch.cat([p_s0, p_s1], axis=1).reshape(-1, p_s0.shape[-1])
+
+    # target shape : torch.Size([1024, 4])
     targets = targets.reshape(-1, 4)
+
+    # labels shape : torch.Size([1024])
     labels = labels.long().flatten()
 
     # cons masks
-    valid_masks = labels >= 0
-    fg_masks = labels > 0
+    valid_masks = labels >= 0 # remove ignore labels
+    fg_masks = labels > 0 # only positive labels 
 
     # multiple class
-    pred_delta = pred_delta.reshape(-1, config.num_classes, 4)
+    pred_delta = pred_delta.reshape(-1, config.num_classes, 4) # [1024, 2, 4]
     fg_gt_classes = labels[fg_masks]
     pred_delta = pred_delta[fg_masks, fg_gt_classes, :]
 
     # loss for regression
+    # only get loss for positive samples 
     localization_loss = smooth_l1_loss(
         pred_delta,
         targets[fg_masks],
@@ -61,6 +87,8 @@ def emd_loss_softmax(p_b0, p_s0, p_b1, p_s1, targets, labels):
     # loss for classification
     objectness_loss = softmax_loss(pred_score, labels)
     loss = objectness_loss * valid_masks
+
+    # total loss
     loss[fg_masks] = loss[fg_masks] + localization_loss
     loss = loss.reshape(-1, 2).sum(axis=1)
     

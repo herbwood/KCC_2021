@@ -18,18 +18,23 @@ def fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
         gt_boxes_perimg = gt_boxes[bid, :int(im_info[bid, 5]), :]
         batch_inds = torch.ones((gt_boxes_perimg.shape[0], 1)).type_as(gt_boxes_perimg) * bid
 
-        gt_rois = torch.cat([batch_inds, gt_boxes_perimg[:, :4]], axis=1)
+        gt_rois = torch.cat([batch_inds, gt_boxes_perimg[:, :4]], axis=1) # shape : [-1, label, x, y, w, h]
         batch_roi_inds = torch.nonzero(rpn_rois[:, 0] == bid, as_tuple=False).flatten()
 
-        all_rois = torch.cat([rpn_rois[batch_roi_inds], gt_rois], axis=0)
+        all_rois = torch.cat([rpn_rois[batch_roi_inds], gt_rois], axis=0) # shape [-1, 5]
         
+        # iou and ioa values
+        # [N, M], [N, M]
         overlaps_normal, overlaps_ignore = box_overlap_ignore_opr(all_rois[:, 1:5], gt_boxes_perimg)
+
         overlaps_normal, overlaps_normal_indices = overlaps_normal.sort(descending=True, dim=1)
         overlaps_ignore, overlaps_ignore_indices = overlaps_ignore.sort(descending=True, dim=1)
 
         # gt max and indices, ignore max and indices
+        # shape : [-1]
         max_overlaps_normal = overlaps_normal[:, :top_k].flatten()
         gt_assignment_normal = overlaps_normal_indices[:, :top_k].flatten()
+
         max_overlaps_ignore = overlaps_ignore[:, :top_k].flatten()
         gt_assignment_ignore = overlaps_ignore_indices[:, :top_k].flatten()
 
@@ -38,6 +43,7 @@ def fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
         max_overlaps = max_overlaps_normal * ~ignore_assign_mask + max_overlaps_ignore * ignore_assign_mask
         gt_assignment = gt_assignment_normal * ~ignore_assign_mask + gt_assignment_ignore * ignore_assign_mask
 
+        # only valid labels 
         labels = gt_boxes_perimg[gt_assignment, 4]
 
         fg_mask = (max_overlaps >= config.fg_threshold) * (labels != config.ignore_label)
@@ -45,6 +51,7 @@ def fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
         fg_mask = fg_mask.reshape(-1, top_k)
         bg_mask = bg_mask.reshape(-1, top_k)
 
+        # random sample positive/negative samples
         pos_max = config.num_rois * config.fg_ratio
         fg_inds_mask = subsample_masks(fg_mask[:, 0], pos_max, True)
         neg_max = config.num_rois - fg_inds_mask.sum()
@@ -59,7 +66,7 @@ def fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
         target_boxes = gt_boxes_perimg[gt_assignment, :4]
         rois = all_rois[keep_mask]
         target_rois = rois.repeat(1, top_k).reshape(-1, all_rois.shape[-1])
-        bbox_targets = bbox_transform_opr(target_rois[:, 1:5], target_boxes)
+        bbox_targets = bbox_transform_opr(target_rois[:, 1:5], target_boxes) # Transform the bounding box and ground truth to the loss targets
 
         if config.rcnn_bbox_normalize_targets:
             std_opr = torch.tensor(config.bbox_normalize_stds[None, :]).type_as(bbox_targets)
@@ -78,6 +85,7 @@ def fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
         return_rois = torch.cat(return_rois, axis=0)
         return_labels = torch.cat(return_labels, axis=0)
         return_bbox_targets = torch.cat(return_bbox_targets, axis=0)
+        
         return return_rois, return_labels, return_bbox_targets
 
 
