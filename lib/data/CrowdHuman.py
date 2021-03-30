@@ -4,9 +4,6 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 from typing import Dict, List, Tuple
-import sys
-
-sys.path.insert(0, 'lib')
 
 from utils import misc_utils
 
@@ -48,7 +45,10 @@ class CrowdHuman(Dataset):
             if_flap = False
 
         # image
-        image_path = os.path.join(self.config.image_folder, record['ID']+'.jpg')
+        if self.training:
+            image_path = os.path.join(self.config.image_folder, record['ID']+'.jpg')
+        else:
+            image_path = os.path.join(self.config.val_image_folder, record['ID']+'.jpg')
 
         image = misc_utils.load_img(image_path)
         image_h = image.shape[0]

@@ -101,7 +101,10 @@ def do_train_epoch(net, data_iter, optimizer, rank, epoch, train_config):
 def train_worker(rank, train_config, network, config):
 
     # set the parallel
-    torch.distributed.init_process_group(backend='nccl', init_method='env://', world_size=train_config.world_size, rank=rank)
+    torch.distributed.init_process_group(backend='gloo', 
+                                        init_method='env://', 
+                                        world_size=train_config.world_size, 
+                                        rank=rank)
 
     # initialize model
     net = network()
@@ -184,6 +187,10 @@ def multi_train(params, config, network):
     misc_utils.ensure_dir(train_config.model_dir)
 
     # print the training config
+    """
+    Num of GPUs:1, learning rate:0.00250, mini batch size:2,
+    train_epoch:30, iter_per_epoch:7500, decay_epoch:[24, 27]
+    """
     line = 'Num of GPUs:{}, learning rate:{:.5f}, mini batch size:{}, \
             \ntrain_epoch:{}, iter_per_epoch:{}, decay_epoch:{}'.format(
             num_gpus, train_config.learning_rate, train_config.mini_batch_size,
@@ -219,4 +226,8 @@ def run_train():
 
 
 if __name__ == '__main__':
+    """
+    cd tools
+    python train.py -md rcnn_emd_refine
+    """
     run_train()
