@@ -60,20 +60,30 @@ class RPN(nn.Module):
                 all_anchors_list, im_info)
         rpn_rois = rpn_rois.type_as(features[0])
 
+
         if self.training:
+            # rpn_labels shape : [-1, 1], pos/neg/ignore
+            # rpn_bbox_targets : [-1, 4] bbox target coords
             rpn_labels, rpn_bbox_targets = fpn_anchor_target(
                     boxes, im_info, all_anchors_list)
 
             #rpn_labels = rpn_labels.astype(np.int32)
+            # pred_cls_score shape : [-1, 2]
+            # pred_bbox_offsets shape : [-1, 4]
             pred_cls_score, pred_bbox_offsets = fpn_rpn_reshape(
                 pred_cls_score_list, pred_bbox_offsets_list)
 
+
             # rpn loss
+
+            # objectness loss
+            # only consider positive/negative anchors
             valid_masks = rpn_labels >= 0
             objectness_loss = softmax_loss(
                 pred_cls_score[valid_masks],
                 rpn_labels[valid_masks])
 
+            # ignore other anchors
             pos_masks = rpn_labels > 0
             localization_loss = smooth_l1_loss(
                 pred_bbox_offsets[pos_masks],

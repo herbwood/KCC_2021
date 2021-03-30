@@ -28,15 +28,15 @@ if __name__ == "__main__":
                 shuffle=True)
 
     for (images, gt_boxes, im_info) in data_iter:
-        # print(images.shape, gt_boxes.shape, im_info.shape)
+
         images = get_padded_tensor(images, 64)
         fpn_fms = FPN(images)
 
-        # for output in fpn_fms:
-        #     print(output.shape)
+        # # for output in fpn_fms:
+        # #     print(output.shape)
         rpn_rois, loss_dict_rpn = RPN(fpn_fms, im_info, gt_boxes)
         # print(rpn_rois.shape)
-        print(loss_dict_rpn.keys())
+        print(loss_dict_rpn)
 
 
 
