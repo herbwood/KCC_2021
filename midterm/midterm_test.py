@@ -86,26 +86,22 @@ if __name__ == "__main__":
         #     """
         #     print(output.shape)
 
-        outputs = balance_feature_pyramid(fpn_fms)
-        for output in outputs:
-            print(output.shape)
+        rpn_rois, loss_dict_rpn = RPN(fpn_fms, im_info, gt_boxes)
 
-        # rpn_rois, loss_dict_rpn = RPN(fpn_fms, im_info, gt_boxes)
+        # rcnn_rois shape : [-1, 5]
+        # rcnn_labels shape : [-1, 2]
+        # rcnn_bbox_targets : [-1, 8]
+        rcnn_rois, rcnn_labels, rcnn_bbox_targets = fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=2)
+        # print(rcnn_rois.shape, rcnn_labels.shape, rcnn_bbox_targets.shape)
 
-        # # rcnn_rois shape : [-1, 5]
-        # # rcnn_labels shape : [-1, 2]
-        # # rcnn_bbox_targets : [-1, 8]
-        # rcnn_rois, rcnn_labels, rcnn_bbox_targets = fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=2)
-        # # print(rcnn_rois.shape, rcnn_labels.shape, rcnn_bbox_targets.shape)
+        fpn_fms = fpn_fms[1:][::-1]
+        stride = [4, 8, 16, 32]
+        pool_features = roi_pooler(fpn_fms, rcnn_rois, stride, (7, 7), "ROIAlignV2")
 
-        # fpn_fms = fpn_fms[1:][::-1]
-        # stride = [4, 8, 16, 32]
-        # pool_features = roi_pooler(fpn_fms, rcnn_rois, stride, (7, 7), "ROIAlignV2")
+        loss_dict_rcnn = RCNN(fpn_fms, rcnn_rois, rcnn_labels, rcnn_bbox_targets)
 
-        # loss_dict_rcnn = RCNN(fpn_fms, rcnn_rois, rcnn_labels, rcnn_bbox_targets)
-
-        # loss_dict.update(loss_dict_rpn) # loss_rpn_cls, loss_rpn_loc
-        # loss_dict.update(loss_dict_rcnn)
+        loss_dict.update(loss_dict_rpn) # loss_rpn_cls, loss_rpn_loc
+        loss_dict.update(loss_dict_rcnn)
     
 
 
