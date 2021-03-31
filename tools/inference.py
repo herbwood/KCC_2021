@@ -52,17 +52,18 @@ def inference(args, config, network):
 def post_process(pred_boxes, config, scale):
 
     if config.test_nms_method == 'set_nms':
-
         assert pred_boxes.shape[-1] > 6, "Not EMD Network! Using normal_nms instead."
         assert pred_boxes.shape[-1] % 6 == 0, "Prediction dim Error!"
 
-        top_k = pred_boxes.shape[-1] // 6
-        n = pred_boxes.shape[0]
-        pred_boxes = pred_boxes.reshape(-1, 6)
-        idents = np.tile(np.arange(n)[:,None], (1, top_k)).reshape(-1, 1)
+        top_k = pred_boxes.shape[-1] // 6 # 2
+        n = pred_boxes.shape[0] # number of predictions 
+        pred_boxes = pred_boxes.reshape(-1, 6) # [n, (x, y, w, h, confidence score, tag)]
+
+        idents = np.tile(np.arange(n)[:,None], (1, top_k)).reshape(-1, 1) # [1, 1, 2, 2, 3, 3, ..., n, n]
         pred_boxes = np.hstack((pred_boxes, idents))
         keep = pred_boxes[:, 4] > config.pred_cls_threshold
         pred_boxes = pred_boxes[keep]
+
         keep = nms_utils.set_cpu_nms(pred_boxes, 0.5)
         pred_boxes = pred_boxes[keep]
 

@@ -5,6 +5,9 @@ import pdb
 def set_cpu_nms(dets, thresh):
     """Pure Python NMS baseline."""
 
+    # dets shape : [number of predictions, 6]
+    # [number of predictions (x, y, w, h, confidence score, tag)]
+
     # get IoU between superior box and all the other inferior boxes
     def _overlap(det_boxes, basement, others):
         eps = 1e-8
@@ -34,34 +37,33 @@ def set_cpu_nms(dets, thresh):
         return ovr
 
     # sort detection in descending order by confidence score
-    # det => [x, y, w, h, confidenc score, pos/neg]
     scores = dets[:, 4]
     order = np.argsort(-scores)
     dets = dets[order]
 
-    numbers = dets[:, -1] # 1 or 0 array shape : (N, -1)
+    numbers = dets[:, -1] # tag : set number 
     keep = np.ones(len(dets)) == 1 # ex) [True, Fals, True, ...]
-    ruler = np.arange(len(dets))
+    ruler = np.arange(len(dets)) # [0, 1, 2, ..., number of boxes]
 
     while ruler.size > 0:
-        basement = ruler[0] # superior box
-        ruler=ruler[1:] # inferior boxes
-        num = numbers[basement] # 1 or 0 of superior box
+        basement = ruler[0] # superior box index
+        ruler=ruler[1:] # indexes of inferior boxes
+        num = numbers[basement] # set number of superior box
 
         # calculate the body overlap
         overlap = _overlap(dets[:, :4], basement, ruler)
-        indices = np.where(overlap > thresh)[0] # thresh = 0.5, indices of IoU over threshold
+        indices = np.where(overlap > thresh)[0] # thresh = 0.5, indexes of IoU over threshold
 
-        # get the first index of boxes with IoU over threshold
-        # and (1 or 0) equal to (1 or 0) of superior box
+        # index of inferior box with IoU over threshold and same set number as superior box
         loc = np.where(numbers[ruler][indices] == num)[0]
 
         # the mask won't change in the step
         mask = keep[ruler[indices][loc]]#.copy() # bool value of loc equal to 1 
-        keep[ruler[indices]] = False
-        keep[ruler[indices][loc][mask]] = True # keep the loc boxes
+        keep[ruler[indices]] = False # remove inferior boxes over IoU threshold and not same set number as superior box
+        keep[ruler[indices][loc][mask]] = True # keep the same set number boxe
         ruler[~keep[ruler]] = -1 # 
-        ruler = ruler[ruler > 0]
+        ruler = ruler[ruler > 0] # remove all erased boxes
+
     
     keep = keep[np.argsort(order)]
 
@@ -109,8 +111,9 @@ def _test():
     box2 = np.array([44,54,123,348,0.8])[None,:]
     box3 = np.array([88,12,340,342,0.65])[None,:]
     boxes = np.concatenate([box1,box2,box3],axis = 0)
-    nms_thresh = 0.5
-    keep = py_cpu_nms(boxes,nms_thresh)
+    
+    nms_thresh = 0.1
+    keep = set_cpu_nms(boxes,nms_thresh)
     alive_boxes = boxes[keep]
 
 if __name__=='__main__':

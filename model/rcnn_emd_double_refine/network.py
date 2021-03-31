@@ -62,6 +62,10 @@ class RCNN(nn.Module):
     def __init__(self):
         super().__init__()
 
+        # set refine
+        self.set_refine_convA = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.set_refine_convB = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+
         # roi head
         self.fc1 = nn.Linear(256*7*7, 1024)
         self.fc2 = nn.Linear(1024, 1024)
@@ -133,6 +137,16 @@ class RCNN(nn.Module):
         pool_features = roi_pooler(fpn_fms, rcnn_rois, stride, (7, 7), "ROIAlignV2")
 
         # print("Pool features shape :", pool_features.shape)
+
+
+        ##########################On Test###################################
+        
+        boxA_features = self.set_refine_convA(pool_features)
+        boxB_features = self.set_refine_convB(pool_features)
+
+        pool_features = boxA_features + boxB_features
+
+        ##########################On Test###################################
 
 
         # FC layers
@@ -244,16 +258,16 @@ class RCNN(nn.Module):
 
         else:
             class_num = pred_ref_cls_0.shape[-1] - 1 # 1
-            tag = torch.arange(class_num).type_as(pred_ref_cls_0)+1 # [1]
-            tag = tag.repeat(pred_ref_cls_0.shape[0], 1).reshape(-1,1) # [#predictions, 1]
+            tag = torch.arange(class_num).type_as(pred_ref_cls_0)+1
+            tag = tag.repeat(pred_ref_cls_0.shape[0], 1).reshape(-1,1)
 
-            pred_scores_0 = F.softmax(pred_ref_cls_0, dim=-1)[:, 1:].reshape(-1, 1) # [#predictions, 1]
+            pred_scores_0 = F.softmax(pred_ref_cls_0, dim=-1)[:, 1:].reshape(-1, 1)
             pred_scores_1 = F.softmax(pred_ref_cls_1, dim=-1)[:, 1:].reshape(-1, 1)
 
-            pred_delta_0 = pred_ref_delta_0[:, 4:].reshape(-1, 4) # [#predictions, 4]
+            pred_delta_0 = pred_ref_delta_0[:, 4:].reshape(-1, 4)
             pred_delta_1 = pred_ref_delta_1[:, 4:].reshape(-1, 4)
 
-            base_rois = rcnn_rois[:, 1:5].repeat(1, class_num).reshape(-1, 4) # [#predictions, 4]
+            base_rois = rcnn_rois[:, 1:5].repeat(1, class_num).reshape(-1, 4)
 
             pred_bbox_0 = restore_bbox(base_rois, pred_delta_0, True)
             pred_bbox_1 = restore_bbox(base_rois, pred_delta_1, True)
@@ -261,7 +275,6 @@ class RCNN(nn.Module):
             pred_bbox_0 = torch.cat([pred_bbox_0, pred_scores_0, tag], axis=1)
             pred_bbox_1 = torch.cat([pred_bbox_1, pred_scores_1, tag], axis=1)
 
-            # [boxA x, y, w, h, confidence score, tag, boxB x, y, w, h, confidence score, tag]
             pred_bbox = torch.cat((pred_bbox_0, pred_bbox_1), axis=1)
 
             return pred_bbox

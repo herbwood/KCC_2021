@@ -56,5 +56,4 @@ def roi_pooler(fpn_fms : List,
         rois_level = rois[inds]
         output[inds] = roi_align(fm_level, rois_level, pool_shape, spatial_scale=1.0/scale_level,
                 sampling_ratio=-1, aligned=pooler_aligned)
-
     return output

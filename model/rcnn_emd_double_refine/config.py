@@ -14,19 +14,17 @@ add_path(os.path.join(root_dir, 'lib'))
 class Crowd_human:
     class_names = ['background', 'person']
     num_classes = len(class_names)
-    root_folder = '/data/CrowdHuman'
-    # image_folder = '/data/CrowdHuman/images'
-    image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\midterm\test_data\image'
-    
-    # train_source = os.path.join('/data/CrowdHuman/annotation_train.odgt')
-    train_source = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\midterm\test_data\test_annotation.odgt'
-    eval_source = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\midterm\test_data\test_annotation.odgt'
+    root_folder = '../lib/data/CrowdHuman'
+    image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\CrowdHuman\images'
+    val_image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\CrowdHuman\val_images'
+    train_source = os.path.join(r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\annotation_train.odgt')
+    eval_source = os.path.join(r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\annotation_val.odgt')
 
 class Config:
     output_dir = 'outputs'
     model_dir = os.path.join(output_dir, 'model_dump')
     eval_dir = os.path.join(output_dir, 'eval_dump')
-    init_weights = '/datamodel/resnet50_fbaug.pth'
+    init_weights = '../lib/data/model/resnet50_fbaug.pth'
 
     # ----------data config---------- #
     image_mean = np.array([103.530, 116.280, 123.675])
@@ -40,6 +38,7 @@ class Config:
     train_source = Crowd_human.train_source
     eval_source = Crowd_human.eval_source
     image_folder = Crowd_human.image_folder
+    val_image_folder = Crowd_human.val_image_folder
     class_names = Crowd_human.class_names
     num_classes = Crowd_human.num_classes
     class_names2id = dict(list(zip(class_names, list(range(num_classes)))))
@@ -49,7 +48,7 @@ class Config:
     backbone_freeze_at = 2
     rpn_channel = 256
     
-    train_batch_per_gpu = 1
+    train_batch_per_gpu = 2
     momentum = 0.9
     weight_decay = 1e-4
     base_lr = 1e-3 * 1.25
