@@ -135,7 +135,6 @@ def fpn_anchor_target(boxes, im_info, all_anchors_list):
     # final_labels : [-1, 1]
     # final-bbox_targets : [-1, 4]
     output = torch.unique(final_bbox_targets)
-    print(output.shape)
     return final_labels, final_bbox_targets
 
 

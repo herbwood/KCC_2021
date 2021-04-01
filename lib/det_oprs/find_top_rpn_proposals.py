@@ -13,6 +13,7 @@ def find_top_rpn_proposals(is_train : bool,
                            all_anchors_list, 
                            im_info):
 
+    # hyperparameters
     prev_nms_top_n = config.train_prev_nms_top_n if is_train else config.test_prev_nms_top_n
     post_nms_top_n = config.train_post_nms_top_n if is_train else config.test_post_nms_top_n
 
@@ -36,6 +37,7 @@ def find_top_rpn_proposals(is_train : bool,
 
         for l in range(list_size):
 
+
             # get proposals and probs
             # offsets ; [-1, 4]
             offsets = rpn_bbox_offsets_list[l][bid].permute(1, 2, 0).reshape(-1, 4)
@@ -54,9 +56,11 @@ def find_top_rpn_proposals(is_train : bool,
             if config.anchor_within_border:
                 proposals = clip_boxes_opr(proposals, im_info[bid, :])
 
+
             # probs shape : [-1, 2]
             probs = rpn_cls_prob_list[l][bid].permute(1,2,0).reshape(-1, 2)
             probs = torch.softmax(probs, dim=-1)[:, 1]
+
 
             # gather the proposals and probs
             batch_proposals_list.append(proposals)

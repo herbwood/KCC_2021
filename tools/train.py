@@ -137,9 +137,10 @@ def train_worker(rank, train_config, network, config):
     crowdhuman = CrowdHuman(config, if_train=True)
     data_iter = torch.utils.data.DataLoader(dataset=crowdhuman,
                                             batch_size=train_config.mini_batch_size,
-                                            num_workers=2,
+                                            num_workers=1,
                                             collate_fn=crowdhuman.merge_batch,
-                                            shuffle=True)
+                                            shuffle=True,
+                                            pin_memory=True)
 
     for epoch_id in range(begin_epoch, train_config.total_epoch+1):
 

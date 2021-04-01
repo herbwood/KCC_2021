@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-input = torch.randn((1, 3, 64, 64))
-downsample = nn.MaxPool2d(kernel_size=2)
-output = downsample(input)
+input1 = torch.randn((8, 4))
+input2 = torch.randn((8, 1))
 
+output = torch.cat((input1, input2), dim=1)
 print(output.shape)
