@@ -89,7 +89,7 @@ if __name__ == "__main__":
         #     """
         #     print(output.shape)
 
-        rpn_rois, loss_dict_rpn = DensityRPN(fpn_fms, im_info, gt_boxes)
+        rpn_rois, density, loss_dict_rpn = DensityRPN(fpn_fms, im_info, gt_boxes)
 
         # rcnn_rois shape : [-1, 5]
         # rcnn_labels shape : [-1, 2]

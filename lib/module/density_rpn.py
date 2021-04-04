@@ -138,34 +138,43 @@ from det_oprs.bbox_opr import box_overlap_opr, bbox_transform_opr
 from config import config
 
 
-def fpn_rpn_reshape(pred_cls_score_list, pred_bbox_offsets_list):
+def density_fpn_rpn_reshape(pred_cls_score_list, pred_bbox_offsets_list, pred_density_list):
 
     final_pred_bbox_offsets_list = []
     final_pred_cls_score_list = []
+    final_pred_density_list = []
+
 
     for bid in range(config.train_batch_per_gpu):
 
         batch_pred_bbox_offsets_list = []
         batch_pred_cls_score_list = []
+        batch_pred_density_list = []
 
         for i in range(len(pred_cls_score_list)):
             pred_cls_score_perlvl = pred_cls_score_list[i][bid].permute(1, 2, 0).reshape(-1, 2)
             pred_bbox_offsets_perlvl = pred_bbox_offsets_list[i][bid].permute(1, 2, 0).reshape(-1, 4)
+            pred_density_perlvl = pred_density_list[i][bid].permute(1, 2, 0).reshape(-1, 1)
+
             batch_pred_cls_score_list.append(pred_cls_score_perlvl)
             batch_pred_bbox_offsets_list.append(pred_bbox_offsets_perlvl)
+            batch_pred_density_list.append(pred_density_perlvl)
 
         batch_pred_cls_score = torch.cat(batch_pred_cls_score_list, dim=0)
         batch_pred_bbox_offsets = torch.cat(batch_pred_bbox_offsets_list, dim=0)
+        batch_pred_density = torch.cat(batch_pred_density_list, dim=0)
 
         final_pred_cls_score_list.append(batch_pred_cls_score)
         final_pred_bbox_offsets_list.append(batch_pred_bbox_offsets)
+        final_pred_density_list.append(batch_pred_density)
 
     final_pred_cls_score = torch.cat(final_pred_cls_score_list, dim=0)
     final_pred_bbox_offsets = torch.cat(final_pred_bbox_offsets_list, dim=0)
+    final_pred_density = torch.cat(final_pred_density_list, dim=0)
 
     # final_pred-cls_score shape : [-1, 2]
     # final_pred-bbox-offsets shape : [-1, 4]
-    return final_pred_cls_score, final_pred_bbox_offsets
+    return final_pred_cls_score, final_pred_bbox_offsets, final_pred_density
 
 
 def density_fpn_anchor_target_opr_core_impl(gt_boxes, im_info, anchors, allow_low_quality_matches=True):
@@ -201,6 +210,7 @@ def density_fpn_anchor_target_opr_core_impl(gt_boxes, im_info, anchors, allow_lo
     density_map = torch.cat((valid_gt_boxes[:, :4], density_overlaps), dim=1)
 
     #_, gt_argmax_overlaps = torch.max(overlaps, axis=0)
+    # shape : number of gt boxes
     gt_argmax_overlaps = my_gt_argmax(overlaps)
 
     del overlaps
@@ -226,10 +236,11 @@ def density_fpn_anchor_target_opr_core_impl(gt_boxes, im_info, anchors, allow_lo
     fg_mask_ind = torch.nonzero(fg_mask, as_tuple=False).flatten()
     labels[fg_mask_ind] = 1
 
+    density_targets = density_map[argmax_overlaps, -1]
+
     # bbox targets
     # Transform the bounding box and ground truth to the loss targets
     # shape : [-1, 4]
-    print(valid_gt_boxes[argmax_overlaps, :4].shape)
     bbox_targets =  bbox_transform_opr(anchors, valid_gt_boxes[argmax_overlaps, :4])
 
     if config.rpn_bbox_normalize_targets:
@@ -240,8 +251,7 @@ def density_fpn_anchor_target_opr_core_impl(gt_boxes, im_info, anchors, allow_lo
 
     # labels : positive = 1, negative = 0, ignore = -1
     # bbox_targets shape : [-1, 4]
-    # print(anchors.shape, labels.shape, bbox_targets.shape, density_targets.shape)
-    return labels, bbox_targets
+    return labels, bbox_targets, density_targets
 
 
 @torch.no_grad()
@@ -259,39 +269,43 @@ def density_fpn_anchor_target(boxes, im_info, all_anchors_list):
 
         for i in range(len(all_anchors_list)):
             anchors_perlvl = all_anchors_list[i]  # shape : [-1, 4]
-            rpn_labels_perlvl, rpn_bbox_targets_perlvl = density_fpn_anchor_target_opr_core_impl(
+            rpn_labels_perlvl, rpn_bbox_targets_perlvl, rpn_density_targets_perlvl = density_fpn_anchor_target_opr_core_impl(
                 boxes[bid], im_info[bid], anchors_perlvl)
 
             batch_labels_list.append(rpn_labels_perlvl)
             batch_bbox_targets_list.append(rpn_bbox_targets_perlvl)
+            batch_density_targets_list.append(rpn_density_targets_perlvl)
 
         # here we samples the rpn_labels
         concated_batch_labels = torch.cat(batch_labels_list, dim=0) # shape : [-1, 1]
         concated_batch_bbox_targets = torch.cat(batch_bbox_targets_list, dim=0) # shape : [-1, 4]
+        concated_batch_density_targets = torch.cat(batch_density_targets_list, dim=0)
 
         # sample labels
         pos_idx, neg_idx = subsample_labels(concated_batch_labels,
-            config.num_sample_anchors, config.positive_anchor_ratio) # 0.5
+                                            config.num_sample_anchors, config.positive_anchor_ratio) # 0.5
         concated_batch_labels.fill_(-1)
         concated_batch_labels[pos_idx] = 1
         concated_batch_labels[neg_idx] = 0
 
         final_labels_list.append(concated_batch_labels)
         final_bbox_targets_list.append(concated_batch_bbox_targets)
+        final_density_targets_list.append(concated_batch_density_targets)
 
     final_labels = torch.cat(final_labels_list, dim=0)
     final_bbox_targets = torch.cat(final_bbox_targets_list, dim=0)
+    final_density_targets = torch.cat(final_density_targets_list, dim=0)
     
     # final_labels : [-1, 1]
     # final-bbox_targets : [-1, 4]
     output = torch.unique(final_bbox_targets)
-    return final_labels, final_bbox_targets
+    return final_labels, final_bbox_targets, final_density_targets
 
 
 def my_gt_argmax(overlaps):
 
-    gt_max_overlaps, _ = torch.max(overlaps, axis=0)
-    gt_max_mask = overlaps == gt_max_overlaps
+    gt_max_overlaps, _ = torch.max(overlaps, axis=0) # shape : number of gtboxes
+    gt_max_mask = overlaps == gt_max_overlaps # shape : number of anchors x number of gt boxes mask
     gt_argmax_overlaps = []
 
     for i in range(overlaps.shape[-1]):
@@ -326,6 +340,111 @@ def subsample_labels(labels,
     
     return pos_idx, neg_idx
 
+import torch
+
+import numpy as np
+from config import config
+from det_oprs.bbox_opr import box_overlap_opr, bbox_transform_opr, box_overlap_ignore_opr
+
+
+@torch.no_grad()
+def density_fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
+
+    return_rois = []
+    return_labels = []
+    return_bbox_targets = []
+
+    # get per image proposals and gt_boxes
+    for bid in range(config.train_batch_per_gpu):
+        gt_boxes_perimg = gt_boxes[bid, :int(im_info[bid, 5]), :]
+        batch_inds = torch.ones((gt_boxes_perimg.shape[0], 1)).type_as(gt_boxes_perimg) * bid
+
+        gt_rois = torch.cat([batch_inds, gt_boxes_perimg[:, :4]], axis=1) # shape : [-1, label, x, y, w, h]
+        batch_roi_inds = torch.nonzero(rpn_rois[:, 0] == bid, as_tuple=False).flatten()
+
+        all_rois = torch.cat([rpn_rois[batch_roi_inds], gt_rois], axis=0) # shape [-1, 5]
+        
+        # iou and ioa values
+        # [N, M], [N, M]
+        overlaps_normal, overlaps_ignore = box_overlap_ignore_opr(all_rois[:, 1:5], gt_boxes_perimg)
+
+        overlaps_normal, overlaps_normal_indices = overlaps_normal.sort(descending=True, dim=1)
+        overlaps_ignore, overlaps_ignore_indices = overlaps_ignore.sort(descending=True, dim=1)
+
+        # gt max and indices, ignore max and indices
+        # shape : [-1]
+        max_overlaps_normal = overlaps_normal[:, :top_k].flatten()
+        gt_assignment_normal = overlaps_normal_indices[:, :top_k].flatten()
+
+        max_overlaps_ignore = overlaps_ignore[:, :top_k].flatten()
+        gt_assignment_ignore = overlaps_ignore_indices[:, :top_k].flatten()
+
+        # cons masks
+        ignore_assign_mask = (max_overlaps_normal < config.fg_threshold) * (max_overlaps_ignore > max_overlaps_normal)
+        max_overlaps = max_overlaps_normal * ~ignore_assign_mask + max_overlaps_ignore * ignore_assign_mask
+        gt_assignment = gt_assignment_normal * ~ignore_assign_mask + gt_assignment_ignore * ignore_assign_mask
+
+        # only valid labels 
+        labels = gt_boxes_perimg[gt_assignment, 4]
+
+        fg_mask = (max_overlaps >= config.fg_threshold) * (labels != config.ignore_label)
+        bg_mask = (max_overlaps < config.bg_threshold_high) * (max_overlaps >= config.bg_threshold_low)
+        fg_mask = fg_mask.reshape(-1, top_k)
+        bg_mask = bg_mask.reshape(-1, top_k)
+
+        # random sample positive/negative samples
+        pos_max = config.num_rois * config.fg_ratio
+        fg_inds_mask = subsample_masks(fg_mask[:, 0], pos_max, True)
+        neg_max = config.num_rois - fg_inds_mask.sum()
+        bg_inds_mask = subsample_masks(bg_mask[:, 0], neg_max, True)
+
+        labels = labels * fg_mask.flatten()
+        keep_mask = fg_inds_mask + bg_inds_mask
+
+        # labels
+        labels = labels.reshape(-1, top_k)[keep_mask]
+        gt_assignment = gt_assignment.reshape(-1, top_k)[keep_mask].flatten()
+        target_boxes = gt_boxes_perimg[gt_assignment, :4]
+        rois = all_rois[keep_mask]
+        target_rois = rois.repeat(1, top_k).reshape(-1, all_rois.shape[-1])
+        bbox_targets = bbox_transform_opr(target_rois[:, 1:5], target_boxes) # Transform the bounding box and ground truth to the loss targets
+
+        if config.rcnn_bbox_normalize_targets:
+            std_opr = torch.tensor(config.bbox_normalize_stds[None, :]).type_as(bbox_targets)
+            mean_opr = torch.tensor(config.bbox_normalize_means[None, :]).type_as(bbox_targets)
+            minus_opr = mean_opr / std_opr
+            bbox_targets = bbox_targets / std_opr - minus_opr
+
+        bbox_targets = bbox_targets.reshape(-1, top_k * 4)
+        return_rois.append(rois)
+        return_labels.append(labels)
+        return_bbox_targets.append(bbox_targets)
+
+    if config.train_batch_per_gpu == 1:
+        return rois, labels, bbox_targets
+    else:
+        return_rois = torch.cat(return_rois, axis=0)
+        return_labels = torch.cat(return_labels, axis=0)
+        return_bbox_targets = torch.cat(return_bbox_targets, axis=0)
+        
+        return return_rois, return_labels, return_bbox_targets
+
+
+def subsample_masks(masks, num_samples, sample_value):
+
+    positive = torch.nonzero(masks.eq(sample_value), as_tuple=False).squeeze(1)
+
+    num_mask = len(positive)
+    num_samples = int(num_samples)
+    num_final_samples = min(num_mask, num_samples)
+    num_final_negative = num_mask - num_final_samples
+
+    perm = torch.randperm(num_mask, device=masks.device)[:num_final_negative]
+    negative = positive[perm]
+    masks[negative] = not sample_value
+    
+    return masks
+
 
 class DensityRPN(nn.Module):
     def __init__(self, rpn_channel = 256):
@@ -347,7 +466,7 @@ class DensityRPN(nn.Module):
         ####################Density############################################
         self.rpn_density = nn.Conv2d(rpn_channel, 128, kernel_size=1, stride=1)
         self.density_conv = nn.Conv2d(128 + config.num_cell_anchors * 2 + config.num_cell_anchors * 4, 
-                                        3, kernel_size=1, stride=1)
+                                        3, kernel_size=5, padding=2, stride=1)
 
         for l in [self.rpn_conv, self.rpn_cls_score, self.rpn_bbox_offsets]:
             nn.init.normal_(l.weight, std=0.01)
@@ -395,15 +514,14 @@ class DensityRPN(nn.Module):
         if self.training:
             # rpn_labels shape : [-1, 1], pos/neg/ignore
             # rpn_bbox_targets : [-1, 4] bbox target coords
-            rpn_labels, rpn_bbox_targets = density_fpn_anchor_target(
+            rpn_labels, rpn_bbox_targets, rpn_density_targets = density_fpn_anchor_target(
                     boxes, im_info, all_anchors_list)
 
             #rpn_labels = rpn_labels.astype(np.int32)
             # pred_cls_score shape : [-1, 2]
             # pred_bbox_offsets shape : [-1, 4]
-            pred_cls_score, pred_bbox_offsets = fpn_rpn_reshape(
-                pred_cls_score_list, pred_bbox_offsets_list)
-
+            pred_cls_score, pred_bbox_offsets, pred_density = density_fpn_rpn_reshape(
+                pred_cls_score_list, pred_bbox_offsets_list, pred_density_list)
 
             # rpn loss
 
@@ -414,6 +532,7 @@ class DensityRPN(nn.Module):
                 pred_cls_score[valid_masks],
                 rpn_labels[valid_masks])
 
+            # localization loss
             # ignore other anchors
             pos_masks = rpn_labels > 0
             localization_loss = smooth_l1_loss(
@@ -421,14 +540,24 @@ class DensityRPN(nn.Module):
                 rpn_bbox_targets[pos_masks],
                 config.rpn_smooth_l1_beta)
 
+            # density loss
+            density_loss = smooth_l1_loss(
+                pred_density[pos_masks],
+                rpn_density_targets[pos_masks],
+                config.rpn_smooth_l1_beta)
+
+
             normalizer = 1 / valid_masks.sum().item()
             loss_rpn_cls = objectness_loss.sum() * normalizer
             loss_rpn_loc = localization_loss.sum() * normalizer
+            loss_rpn_den = density_loss.sum() * normalizer
 
             loss_dict = {}
             loss_dict['loss_rpn_cls'] = loss_rpn_cls
             loss_dict['loss_rpn_loc'] = loss_rpn_loc
+            loss_dict['loss_rpn_den'] = loss_rpn_den
+
             
-            return rpn_rois, loss_dict
+            return rpn_rois, batch_density, loss_dict
         else:
-            return rpn_rois
+            return rpn_rois, batch_density

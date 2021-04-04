@@ -2,8 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-input1 = torch.randn((8, 4))
-input2 = torch.randn((8, 1))
 
-output = torch.cat((input1, input2), dim=1)
+torch.Size([38, 5])
+torch.Size([858])
+torch.Size([858, 4])
+
+input = torch.randn((38, 5))
+args = torch.randint(1, 100, 100)
+output = input[args, :4]
 print(output.shape)
