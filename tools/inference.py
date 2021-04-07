@@ -61,7 +61,7 @@ def post_process(pred_boxes, config, scale):
 
         idents = np.tile(np.arange(n)[:,None], (1, top_k)).reshape(-1, 1) # [1, 1, 2, 2, 3, 3, ..., n, n]
         pred_boxes = np.hstack((pred_boxes, idents))
-        keep = pred_boxes[:, 4] > config.pred_cls_threshold
+        keep = pred_boxes[:, 4] > config.pred_cls_threshold 
         pred_boxes = pred_boxes[keep]
 
         keep = nms_utils.set_cpu_nms(pred_boxes, 0.5)
@@ -109,6 +109,7 @@ def resize_img(image, short_size, max_size):
     scale = (short_size + 0.0) / im_size_min
     if scale * im_size_max > max_size:
         scale = (max_size + 0.0) / im_size_max
+        
     t_height, t_width = int(round(height * scale)), int(
         round(width * scale))
     resized_image = cv2.resize(

@@ -23,37 +23,8 @@ import torch.nn.functional as F
 
 from typing import Sequence
 
-from module.density_rpn import DensityRPN
-
-def balance_feature_pyramid(fpn_fms):
-    
-    target_feature_map : Sequence = fpn_fms[-1]
-    target_h, target_w = target_feature_map.shape[2:4]
-
-    balanced_feature_map = target_feature_map
-    scale_list = []
-    outputs = []
-
-    for i in range(len(fpn_fms)):
-        h, w = fpn_fms[i].shape[2:4]
-        scale = target_h // h
-        
-        if scale == 1:
-            continue
-
-        scale_list.append(scale)
-        scaled_feature_map = F.interpolate(fpn_fms[i], scale_factor=scale, mode='bilinear', align_corners=True)
-        balanced_feature_map += scaled_feature_map
-
-    for i, scale in enumerate(scale_list):
-        if scale == 1:
-            continue
-        downsample = nn.MaxPool2d(kernel_size=scale)
-        outputs.append(downsample(balanced_feature_map))
-
-    return outputs
-
-
+from module.density_rpn import DensityRPN, density_fpn_roi_target
+from rcnn_emd_density_refine.network import RCNN
 
 
 if __name__ == "__main__":
@@ -89,13 +60,12 @@ if __name__ == "__main__":
         #     """
         #     print(output.shape)
 
-        rpn_rois, density, loss_dict_rpn = DensityRPN(fpn_fms, im_info, gt_boxes)
-
+        rpn_rois, loss_dict_rpn = DensityRPN(fpn_fms, im_info, gt_boxes)
         # rcnn_rois shape : [-1, 5]
         # rcnn_labels shape : [-1, 2]
         # rcnn_bbox_targets : [-1, 8]
-        # rcnn_rois, rcnn_labels, rcnn_bbox_targets = fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=2)
-        # # print(rcnn_rois.shape, rcnn_labels.shape, rcnn_bbox_targets.shape)
+        rcnn_rois, rcnn_labels, rcnn_bbox_targets = density_fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=2)
+        # print(rcnn_rois.shape, rcnn_labels.shape, rcnn_bbox_targets.shape)
 
         # fpn_fms = fpn_fms[1:][::-1]
         # stride = [4, 8, 16, 32]
@@ -105,11 +75,3 @@ if __name__ == "__main__":
 
         # loss_dict.update(loss_dict_rpn) # loss_rpn_cls, loss_rpn_loc
         # loss_dict.update(loss_dict_rcnn)
-    
-
-
-
-
-
-
-

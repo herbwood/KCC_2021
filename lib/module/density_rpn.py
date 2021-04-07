@@ -119,15 +119,15 @@ def density_find_top_rpn_proposals(is_train : bool,
         #batch_probs = batch_probs[keep]
         # cons the rois
         batch_inds = torch.ones(batch_proposals.shape[0], 1).type_as(batch_proposals) * bid
-        batch_rois = torch.cat([batch_inds, batch_proposals], axis=1) # shape : [2000, 5] (bid(), x, y , w, h)
+        batch_rois = torch.cat([batch_inds, batch_proposals, batch_density], axis=1) # shape : [2000, 5] (bid(), x, y , w, h)
         return_rois.append(batch_rois)
 
     if batch_per_gpu == 1:
-        return batch_rois, batch_density
+        return batch_rois
 
     else:
         concated_rois = torch.cat(return_rois, axis=0)
-        return concated_rois, batch_density
+        return concated_rois
 
 
 
@@ -353,15 +353,18 @@ def density_fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
     return_rois = []
     return_labels = []
     return_bbox_targets = []
+    return_density_targets = []
 
     # get per image proposals and gt_boxes
     for bid in range(config.train_batch_per_gpu):
         gt_boxes_perimg = gt_boxes[bid, :int(im_info[bid, 5]), :]
         batch_inds = torch.ones((gt_boxes_perimg.shape[0], 1)).type_as(gt_boxes_perimg) * bid
 
-        gt_rois = torch.cat([batch_inds, gt_boxes_perimg[:, :4]], axis=1) # shape : [-1, label, x, y, w, h]
-        batch_roi_inds = torch.nonzero(rpn_rois[:, 0] == bid, as_tuple=False).flatten()
+        gt_rois = torch.cat([batch_inds, gt_boxes_perimg[:, :4]], axis=1) # shape : [-1, (label, x, y, w, h)]
+        one_tensors = torch.ones((gt_rois.shape[0], 1))
+        gt_rois = torch.cat([gt_rois, one_tensors], dim=1)
 
+        batch_roi_inds = torch.nonzero(rpn_rois[:, 0] == bid, as_tuple=False).flatten()
         all_rois = torch.cat([rpn_rois[batch_roi_inds], gt_rois], axis=0) # shape [-1, 5]
         
         # iou and ioa values
@@ -406,8 +409,11 @@ def density_fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=1):
         gt_assignment = gt_assignment.reshape(-1, top_k)[keep_mask].flatten()
         target_boxes = gt_boxes_perimg[gt_assignment, :4]
         rois = all_rois[keep_mask]
+        print(all_rois.shape)
         target_rois = rois.repeat(1, top_k).reshape(-1, all_rois.shape[-1])
+
         bbox_targets = bbox_transform_opr(target_rois[:, 1:5], target_boxes) # Transform the bounding box and ground truth to the loss targets
+
 
         if config.rcnn_bbox_normalize_targets:
             std_opr = torch.tensor(config.bbox_normalize_stds[None, :]).type_as(bbox_targets)
@@ -505,18 +511,18 @@ class DensityRPN(nn.Module):
 
         # sample from the predictions
         # rpn_rois shape : [2000, 5]
-        rpn_rois, batch_density = density_find_top_rpn_proposals(
+        rpn_rois = density_find_top_rpn_proposals(
                 self.training, pred_bbox_offsets_list, pred_cls_score_list, pred_density_list,
                 all_anchors_list, im_info)
         rpn_rois = rpn_rois.type_as(features[0])
 
-
-        if self.training:
-            # rpn_labels shape : [-1, 1], pos/neg/ignore
-            # rpn_bbox_targets : [-1, 4] bbox target coords
-            rpn_labels, rpn_bbox_targets, rpn_density_targets = density_fpn_anchor_target(
+        # rpn_labels shape : [-1, 1], pos/neg/ignore
+        # rpn_bbox_targets : [-1, 4] bbox target coords
+        rpn_labels, rpn_bbox_targets, rpn_density_targets = density_fpn_anchor_target(
                     boxes, im_info, all_anchors_list)
 
+
+        if self.training:
             #rpn_labels = rpn_labels.astype(np.int32)
             # pred_cls_score shape : [-1, 2]
             # pred_bbox_offsets shape : [-1, 4]
@@ -524,7 +530,6 @@ class DensityRPN(nn.Module):
                 pred_cls_score_list, pred_bbox_offsets_list, pred_density_list)
 
             # rpn loss
-
             # objectness loss
             # only consider positive/negative anchors
             valid_masks = rpn_labels >= 0
@@ -558,6 +563,6 @@ class DensityRPN(nn.Module):
             loss_dict['loss_rpn_den'] = loss_rpn_den
 
             
-            return rpn_rois, batch_density, loss_dict
+            return rpn_rois, loss_dict
         else:
-            return rpn_rois, batch_density
+            return rpn_rois

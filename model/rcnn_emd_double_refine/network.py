@@ -12,6 +12,7 @@ from det_oprs.bbox_opr import bbox_transform_inv_opr
 from det_oprs.fpn_roi_target import fpn_roi_target
 from det_oprs.loss_opr import emd_loss_softmax
 from det_oprs.utils import get_padded_tensor
+from det_oprs.refine import feature_level_refine
 
 
 class Network(nn.Module):
@@ -53,6 +54,7 @@ class Network(nn.Module):
 
     def _forward_test(self, image, im_info):
         fpn_fms = self.FPN(image)
+        fpn_fms = feature_level_refine(fpn_fms)
         rpn_rois = self.RPN(fpn_fms, im_info)
         pred_bbox = self.RCNN(fpn_fms, rpn_rois)
         return pred_bbox.cpu().detach()
@@ -145,6 +147,7 @@ class RCNN(nn.Module):
         boxB_features = self.set_refine_convB(pool_features)
 
         pool_features = boxA_features + boxB_features
+        pool_features /= 2
 
         ##########################On Test###################################
 
