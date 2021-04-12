@@ -6,13 +6,14 @@ import numpy as np
 from config import config
 from backbone.resnet50 import ResNet50
 from backbone.fpn import FPN
+from backbone.bfp import BFP
 from module.rpn import RPN
 from layers.pooler import roi_pooler
 from det_oprs.bbox_opr import bbox_transform_inv_opr
 from det_oprs.fpn_roi_target import fpn_roi_target
 from det_oprs.loss_opr import emd_loss_softmax
 from det_oprs.utils import get_padded_tensor
-from det_oprs.refine import feature_level_refine
+# from det_oprs.refine import feature_level_refine, feature_level_balanced_refine
 
 
 class Network(nn.Module):
@@ -22,6 +23,7 @@ class Network(nn.Module):
 
         self.resnet50 = ResNet50(config.backbone_freeze_at, False)
         self.FPN = FPN(self.resnet50, 2, 6)
+        self.BFP = BFP(in_channels=256, num_levels=5)
         self.RPN = RPN(config.rpn_channel)
         self.RCNN = RCNN()
 
@@ -41,6 +43,7 @@ class Network(nn.Module):
 
         loss_dict = {}
         fpn_fms = self.FPN(image)
+        fpn_fms = self.BFP(fpn_fms)
 
         # fpn_fms stride: 64,32,16,8,4, p6->p2
         rpn_rois, loss_dict_rpn = self.RPN(fpn_fms, im_info, gt_boxes) # proposals to pool, loss 
@@ -54,7 +57,7 @@ class Network(nn.Module):
 
     def _forward_test(self, image, im_info):
         fpn_fms = self.FPN(image)
-        fpn_fms = feature_level_refine(fpn_fms)
+        fpn_fms = self.BFP(fpn_fms)
         rpn_rois = self.RPN(fpn_fms, im_info)
         pred_bbox = self.RCNN(fpn_fms, rpn_rois)
         return pred_bbox.cpu().detach()
@@ -141,15 +144,12 @@ class RCNN(nn.Module):
         # print("Pool features shape :", pool_features.shape)
 
 
-        ##########################On Test###################################
         
-        boxA_features = self.set_refine_convA(pool_features)
-        boxB_features = self.set_refine_convB(pool_features)
+        # boxA_features = self.set_refine_convA(pool_features)
+        # boxB_features = self.set_refine_convB(pool_features)
 
-        pool_features = boxA_features + boxB_features
-        pool_features /= 2
-
-        ##########################On Test###################################
+        # pool_features = boxA_features + boxB_features
+        # pool_features /= 2
 
 
         # FC layers

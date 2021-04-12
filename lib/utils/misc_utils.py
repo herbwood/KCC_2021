@@ -115,6 +115,7 @@ def load_gt(dict_input,
     [417. 182. 139. 518.   1.]
     [429. 171. 224. 511.   1.]
     [543. 178. 262. 570.   1.]]
+    
     """
 
     assert key_name in dict_input

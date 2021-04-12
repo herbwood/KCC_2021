@@ -13,7 +13,9 @@ from det_oprs.bbox_opr import bbox_transform_inv_opr
 from det_oprs.loss_opr import emd_loss_focal
 from det_oprs.utils import get_padded_tensor
 
+
 class Network(nn.Module):
+
     def __init__(self):
         super().__init__()
         self.resnet50 = ResNet50(config.backbone_freeze_at, False)
@@ -27,24 +29,29 @@ class Network(nn.Module):
         image = (image - torch.tensor(config.image_mean[None, :, None, None]).type_as(image)) / (
                 torch.tensor(config.image_std[None, :, None, None]).type_as(image))
         image = get_padded_tensor(image, 64)
+
         # do inference
         # stride: 128,64,32,16,8, p7->p3
         fpn_fms = self.FPN(image)
         anchors_list = self.R_Anchor(fpn_fms)
         pred_cls_list, pred_reg_list = self.R_Head(fpn_fms)
+
         # release the useless data
         if self.training:
-            loss_dict = self.R_Criteria(
-                    pred_cls_list, pred_reg_list, anchors_list, gt_boxes, im_info)
+            loss_dict = self.R_Criteria(pred_cls_list, pred_reg_list, 
+                                        anchors_list, gt_boxes, im_info)
             return loss_dict
+
         else:
             #pred_bbox = union_inference(
             #        anchors_list, pred_cls_list, pred_reg_list, im_info)
-            pred_bbox = per_layer_inference(
-                    anchors_list, pred_cls_list, pred_reg_list, im_info)
+            pred_bbox = per_layer_inference(anchors_list, pred_cls_list, 
+                                            pred_reg_list, im_info)
             return pred_bbox.cpu().detach()
 
+
 class RetinaNet_Anchor():
+
     def __init__(self):
         self.anchors_generator = AnchorGenerator(
             config.anchor_base_size,
@@ -63,7 +70,9 @@ class RetinaNet_Anchor():
             
         return all_anchors_list
 
+
 class RetinaNet_Criteria(nn.Module):
+
     def __init__(self):
         super().__init__()
         self.loss_normalizer = 100 # initialize with any reasonable #fg that's not too small
@@ -102,7 +111,9 @@ class RetinaNet_Criteria(nn.Module):
         loss_dict['retina_emd'] = loss_emd
         return loss_dict
 
+
 class RetinaNet_Head(nn.Module):
+
     def __init__(self):
         super().__init__()
         num_convs = 4
@@ -156,6 +167,7 @@ class RetinaNet_Head(nn.Module):
             for _ in pred_reg]
         return pred_cls_list, pred_reg_list
 
+
 def per_layer_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
     keep_anchors = []
     keep_cls = []
@@ -195,6 +207,7 @@ def per_layer_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
     pred_bbox = torch.cat((pred_bbox_0, pred_bbox_1), axis=1)
     return pred_bbox
 
+
 def union_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
     anchors = torch.cat(anchors_list, axis = 0)
     pred_cls = torch.cat(pred_cls_list, axis = 1)[0]
@@ -216,6 +229,7 @@ def union_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
     pred_bbox_1 = torch.cat([pred_bbox_1, pred_scores_1, tag], axis=1)
     pred_bbox = torch.cat((pred_bbox_0, pred_bbox_1), axis=1)
     return pred_bbox
+
 
 def restore_bbox(rois, deltas, unnormalize=True):
     if unnormalize:

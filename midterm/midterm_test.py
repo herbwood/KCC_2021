@@ -24,7 +24,9 @@ import torch.nn.functional as F
 from typing import Sequence
 
 from module.density_rpn import DensityRPN, density_fpn_roi_target
-from rcnn_emd_density_refine.network import RCNN
+# from rcnn_emd_density_refine.network import RCNN
+from backbone.bfp import BFP
+
 
 
 if __name__ == "__main__":
@@ -33,6 +35,7 @@ if __name__ == "__main__":
     FPN = FPN(resnet50, 2, 6)
     RPN = RPN(rpn_channel=256)
     DensityRPN = DensityRPN(rpn_channel=256)
+    BFP = BFP(in_channels=256, num_levels=5, refine_type='non_local')
     RCNN = RCNN()
 
     crowdhuman = CrowdHuman(config, if_train=True)
@@ -48,23 +51,27 @@ if __name__ == "__main__":
 
         images = get_padded_tensor(images, 64)
         fpn_fms = FPN(images)
+        bfp_fms = BFP(fpn_fms)
+
+        for output in bfp_fms:
+            print(output.shape)
 
         # for output in fpn_fms:
-        #     """
-        #     Output shape example :
-        #     torch.Size([1, 256, 13, 19])
-        #     torch.Size([1, 256, 26, 38])
-        #     torch.Size([1, 256, 52, 76])
-        #     torch.Size([1, 256, 104, 152])
-        #     torch.Size([1, 256, 208, 304])
-        #     """
+        # #     """
+        # #     Output shape example :
+        # #     torch.Size([1, 256, 13, 19])
+        # #     torch.Size([1, 256, 26, 38])
+        # #     torch.Size([1, 256, 52, 76])
+        # #     torch.Size([1, 256, 104, 152])
+        # #     torch.Size([1, 256, 208, 304])
+        # #     """
         #     print(output.shape)
 
-        rpn_rois, loss_dict_rpn = DensityRPN(fpn_fms, im_info, gt_boxes)
-        # rcnn_rois shape : [-1, 5]
-        # rcnn_labels shape : [-1, 2]
-        # rcnn_bbox_targets : [-1, 8]
-        rcnn_rois, rcnn_labels, rcnn_bbox_targets = density_fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=2)
+        # rpn_rois, loss_dict_rpn = DensityRPN(fpn_fms, im_info, gt_boxes)
+        # # rcnn_rois shape : [-1, 5]
+        # # rcnn_labels shape : [-1, 2]
+        # # rcnn_bbox_targets : [-1, 8]
+        # rcnn_rois, rcnn_labels, rcnn_bbox_targets = density_fpn_roi_target(rpn_rois, im_info, gt_boxes, top_k=2)
         # print(rcnn_rois.shape, rcnn_labels.shape, rcnn_bbox_targets.shape)
 
         # fpn_fms = fpn_fms[1:][::-1]
