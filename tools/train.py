@@ -3,6 +3,8 @@ import sys
 import argparse
 import torch
 
+import time
+
 sys.path.insert(0, '../lib')
 sys.path.insert(0, '../model')
 
@@ -48,8 +50,10 @@ def do_train_epoch(net, data_iter, optimizer, rank, epoch, train_config):
         for param_group in optimizer.param_groups:
             param_group['lr'] = train_config.learning_rate / 100
 
-
+    # last_time = time.time()
     for (images, gt_boxes, im_info), step in zip(data_iter, range(0, train_config.iter_per_epoch)):
+        
+        
 
         if images is None:
             continue
@@ -87,6 +91,9 @@ def do_train_epoch(net, data_iter, optimizer, rank, epoch, train_config):
 
                 line = 'Epoch:{}, iter:{}, lr:{:.5f}, loss is {:.4f}.'.format(
                         epoch, step, optimizer.param_groups[0]['lr'], stastic_total_loss)
+                
+                # print(last_time - time.time())
+                # last_time = time.time()
                 print(line)
                 print(outputs)
 
@@ -230,6 +237,7 @@ def run_train():
 if __name__ == '__main__':
     """
     cd tools
-    python train.py -md rcnn_emd_refine
+    python train.py -md rcnn_emd_double_refine
+    python train.py -md retina_emd_simple
     """
     run_train()

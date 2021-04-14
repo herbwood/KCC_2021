@@ -22,21 +22,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from typing import Sequence
-
-from module.density_rpn import DensityRPN, density_fpn_roi_target
-# from rcnn_emd_density_refine.network import RCNN
 from backbone.bfp import BFP
+# from retina_emd_diou.network import RetinaNet_Head, RetinaNet_Anchor, RetinaNet_Criteria
+from retina_emd_simple.network import RetinaNet_Head, RetinaNet_Anchor, RetinaNet_Criteria
 
 
 
 if __name__ == "__main__":
+### One-stage
+    
 
     resnet50 = ResNet50(2, False)
-    FPN = FPN(resnet50, 2, 6)
-    RPN = RPN(rpn_channel=256)
-    DensityRPN = DensityRPN(rpn_channel=256)
-    BFP = BFP(in_channels=256, num_levels=5, refine_type='non_local')
-    RCNN = RCNN()
+    FPN = FPN(resnet50, 3, 7)
+    R_Head = RetinaNet_Head()
+    R_Anchor = RetinaNet_Anchor()
+    R_Criteria = RetinaNet_Criteria()
 
     crowdhuman = CrowdHuman(config, if_train=True)
     data_iter = torch.utils.data.DataLoader(dataset=crowdhuman,
@@ -49,12 +49,39 @@ if __name__ == "__main__":
 
     for (images, gt_boxes, im_info) in data_iter:
 
-        images = get_padded_tensor(images, 64)
+        images = get_padded_tensor(images, +64)
         fpn_fms = FPN(images)
-        bfp_fms = BFP(fpn_fms)
+        anchors_list = R_Anchor(fpn_fms)
+        pred_cls_list, pred_reg_list = R_Head(fpn_fms)
 
-        for output in bfp_fms:
-            print(output.shape)
+        loss_dict = R_Criteria(pred_cls_list, pred_reg_list, 
+                                anchors_list, gt_boxes, im_info)
+        print(loss_dict)
+
+#### Two-stage 
+    # resnet50 = ResNet50(2, False)
+    # FPN = FPN(resnet50, 2, 6)
+    # RPN = RPN(rpn_channel=256)
+    # BFP = BFP(in_channels=256, num_levels=5, refine_type='non_local')
+    # RCNN = RCNN()
+
+    # crowdhuman = CrowdHuman(config, if_train=True)
+    # data_iter = torch.utils.data.DataLoader(dataset=crowdhuman,
+    #             batch_size=1,
+    #             num_workers=2,
+    #             collate_fn=crowdhuman.merge_batch,
+    #             shuffle=True)
+
+    # loss_dict = {}
+
+    # for (images, gt_boxes, im_info) in data_iter:
+
+    #     images = get_padded_tensor(images, 64)
+    #     fpn_fms = FPN(images)
+    #     bfp_fms = BFP(fpn_fms)
+
+    #     for output in bfp_fms:
+    #         print(output.shape)
 
         # for output in fpn_fms:
         # #     """
