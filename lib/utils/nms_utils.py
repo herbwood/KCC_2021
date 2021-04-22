@@ -68,6 +68,7 @@ def set_cpu_nms(dets, thresh):
     keep = keep[np.argsort(order)]
 
     return keep
+    
 
 
 def cpu_nms(dets, base_thr):

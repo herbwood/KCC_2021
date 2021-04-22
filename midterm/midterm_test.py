@@ -24,7 +24,7 @@ import torch.nn.functional as F
 from typing import Sequence
 from backbone.bfp import BFP
 # from retina_emd_diou.network import RetinaNet_Head, RetinaNet_Anchor, RetinaNet_Criteria
-from retina_emd_simple.network import RetinaNet_Head, RetinaNet_Anchor, RetinaNet_Criteria
+from retina_emd_diou.network import RetinaNet_Head, RetinaNet_Anchor, RetinaNet_Criteria
 
 
 

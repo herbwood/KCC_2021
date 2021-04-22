@@ -145,11 +145,11 @@ class RCNN(nn.Module):
 
 
         
-        # boxA_features = self.set_refine_convA(pool_features)
-        # boxB_features = self.set_refine_convB(pool_features)
+        boxA_features = self.set_refine_convA(pool_features)
+        boxB_features = self.set_refine_convB(pool_features)
 
-        # pool_features = boxA_features + boxB_features
-        # pool_features /= 2
+        pool_features = boxA_features + boxB_features
+        pool_features /= 2
 
 
         # FC layers

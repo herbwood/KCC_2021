@@ -68,7 +68,7 @@ class Config:
     # ----------dataset config---------- #
     nr_box_dim = 5
     max_boxes_of_image = 500
-
+    val_image_folder = Crowd_human.val_image_folder
     # --------anchor generator config-------- #
     anchor_base_size = 32 # the minimize anchor size in the bigest feature map.
     anchor_base_scale = [2**0, 2**(1/3), 2**(2/3)]

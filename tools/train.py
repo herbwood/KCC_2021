@@ -10,6 +10,7 @@ sys.path.insert(0, '../model')
 
 from data.CrowdHuman import CrowdHuman
 from utils import misc_utils
+from utils.visual_utils import plot_grad_flow
 
 
 class Train_config:
@@ -51,6 +52,7 @@ def do_train_epoch(net, data_iter, optimizer, rank, epoch, train_config):
             param_group['lr'] = train_config.learning_rate / 100
 
     # last_time = time.time()
+    loss_all = 0.0
     for (images, gt_boxes, im_info), step in zip(data_iter, range(0, train_config.iter_per_epoch)):
         
         
@@ -81,16 +83,20 @@ def do_train_epoch(net, data_iter, optimizer, rank, epoch, train_config):
         assert torch.isfinite(total_loss).all(), outputs
 
         # backward 
+        
         total_loss.backward()
+        # loss_all += total_loss.item()
+        # plot_grad_flow(net.named_parameters())
         optimizer.step()
 
         # print, write results 
         if rank == 0:
             if step % train_config.log_dump_interval == 0:
                 stastic_total_loss = total_loss.item()
+                loss_all += stastic_total_loss * 2
 
                 line = 'Epoch:{}, iter:{}, lr:{:.5f}, loss is {:.4f}.'.format(
-                        epoch, step, optimizer.param_groups[0]['lr'], stastic_total_loss)
+                        epoch, step, optimizer.param_groups[0]['lr'], loss_all / ((step+1) * 2))
                 
                 # print(last_time - time.time())
                 # last_time = time.time()
@@ -138,8 +144,8 @@ def train_worker(rank, train_config, network, config):
         begin_epoch = train_config.resume_weights + 1
 
     # using distributed data parallel
-    net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[rank], broadcast_buffers=False, 
-                                                    find_unused_parameters=True)
+    net = torch.nn.parallel.DistributedDataParallel(net, device_ids=[rank], broadcast_buffers=False)
+                                                    # find_unused_parameters=True)
 
     # build data provider
     crowdhuman = CrowdHuman(config, if_train=True)

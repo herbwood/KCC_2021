@@ -21,17 +21,22 @@ def retina_anchor_target(anchors, gt_boxes, im_info, top_k=1):
         anchors = anchors.type_as(gt_boxes_perimg)
 
         # IoU between bbox and gt box
-        # number of anchors x number of gt boxes
+        # number of anchors x number of gt boxes per image
         overlaps = box_overlap_opr(anchors, gt_boxes_perimg[:, :-1]) 
         
 
         # gt max and indices
         # shape : number of anchors x (top_k)
         # anchor box와 IoU 값이 높은 상위 2개의 ground truth box와의 IoU 값 
+        # max overlaps.flatten
+        # bbox1 top1 iou, bbox1 top2 iou, bbox2 top1 iou, bbox2 top2 iou, ... 
+        # gt_assignment.flatten
+        # bbox1 top1 index, bbox1 top2 index, bbox2 top1 index, bbox top2 index, ... 
         max_overlaps, gt_assignment = overlaps.topk(top_k, dim=1, sorted=True)
         max_overlaps= max_overlaps.flatten()
         gt_assignment= gt_assignment.flatten()
 
+        # gt_assignment_for_gt : bbox에 할당할 gt box의 index 
         # shape : number of gtboxes indicies
         _, gt_assignment_for_gt = torch.max(overlaps, axis=0)
         del overlaps
@@ -41,6 +46,7 @@ def retina_anchor_target(anchors, gt_boxes, im_info, top_k=1):
         labels = labels * (max_overlaps >= config.negative_thresh)
         ignore_mask = (max_overlaps < config.positive_thresh) * (max_overlaps >= config.negative_thresh)
         labels[ignore_mask] = -1
+        
 
         # cons bbox targets
         target_boxes = gt_boxes_perimg[gt_assignment, :4]
@@ -60,8 +66,6 @@ def retina_anchor_target(anchors, gt_boxes, im_info, top_k=1):
         bbox_targets = bbox_targets.reshape(-1, 4 * top_k)
         return_labels.append(labels)
         return_bbox_targets.append(bbox_targets)
-
-        print("Label shape(anchor target part) :", labels.shape)
 
     if config.train_batch_per_gpu == 1:
         # labels shape : number of anchors x 2

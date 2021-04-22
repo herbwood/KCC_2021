@@ -38,17 +38,13 @@ class CrowdHuman(Dataset):
     def load_record(self, 
                     record : Dict) -> Tuple:
         
-        # random flap True or False
         if self.training:
             if_flap = np.random.randint(2) == 1
         else:
             if_flap = False
 
         # image
-        if self.training:
-            image_path = os.path.join(self.config.image_folder, record['ID']+'.jpg')
-        else:
-            image_path = os.path.join(self.config.val_image_folder, record['ID']+'.jpg')
+        image_path = os.path.join(self.config.image_folder, record['ID']+'.jpg')
 
         image = misc_utils.load_img(image_path)
         image_h = image.shape[0]
@@ -60,9 +56,9 @@ class CrowdHuman(Dataset):
         if self.training:
             # ground_truth 
             gtboxes = misc_utils.load_gt(record, 'gtboxes', 'fbox', self.config.class_names)                           
-            keep : List[bool] = (gtboxes[:, 2]>=0) * (gtboxes[:, 3]>=0)
+            keep : List[bool] = (gtboxes[:, 2]>=0) * (gtboxes[:, 3]>=0) # width, height가 0 이상인 애들만 남긴다 
             gtboxes = gtboxes[keep, :]
-            gtboxes[:, 2:4] += gtboxes[:, :2] # xywh -> x1y1x2y2
+            gtboxes[:, 2:4] += gtboxes[:, :2] # xywh => x1y1x2y2
             
 
             if if_flap:
@@ -72,7 +68,7 @@ class CrowdHuman(Dataset):
             im_info = np.array([0, 0, 1, image_h, image_w, nr_gtboxes])
 
             # image
-            # gtboxes : [x, y, w, h, tag]
+            # gtboxes : [x1, y1, x2, y2, tag]
             # im_info : [0, 0, 1, h, w, number of gtboxes]
             return image, gtboxes, im_info
 
@@ -88,7 +84,7 @@ class CrowdHuman(Dataset):
             gtboxes[:, 2:4] += gtboxes[:, :2]
             gtboxes = torch.tensor(gtboxes)
 
-            # im_info
+            # im_info : (target height, target width, scale, image height, image width, number of gt boxes)
             nr_gtboxes = gtboxes.shape[0]
             im_info = torch.tensor([t_height, t_width, scale, image_h, image_w, nr_gtboxes])
 

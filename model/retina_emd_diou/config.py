@@ -16,7 +16,7 @@ class Crowd_human:
     num_classes = len(class_names)
     root_folder = '../lib/data/CrowdHuman'
     image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\CrowdHuman\images'
-    val_image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\CrowdHuman\val_images'
+    # val_image_folder = r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\CrowdHuman\val_images'
     train_source = os.path.join(r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\annotation_train.odgt')
     eval_source = os.path.join(r'C:\Users\June hyoung Kwon\PROJECTS\KCC_2021\lib\data\annotation_val.odgt')
 
@@ -81,7 +81,7 @@ class Config:
     positive_thresh = 0.5
     allow_low_quality = True
 
-    bbox_normalize_means = np.array([0, 0, 0, 0])
-    bbox_normalize_stds = np.array([0.1, 0.1, 0.2, 0.2])
+    # bbox_normalize_means = np.array([0, 0, 0, 0])
+    # bbox_normalize_stds = np.array([0.1, 0.1, 0.2, 0.2])
 
 config = Config()

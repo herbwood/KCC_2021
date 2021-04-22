@@ -79,6 +79,7 @@ class AnchorGenerator():
             axis=1)
 
         return shifts 
+        
 
 
     def get_anchors_by_feature(self, fm_map, base_stride, off_stride):

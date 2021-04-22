@@ -14,12 +14,14 @@ def retina_anchor_target_diou(anchors, gt_boxes, im_info, top_k=1):
     return_anchors = []
 
     for bid in range(config.train_batch_per_gpu):
-
+        
         gt_boxes_perimg = gt_boxes[bid, :int(im_info[bid, 5]), :]
         anchors = anchors.type_as(gt_boxes_perimg)
-        
+
         # IoU between bbox and gt box
         # number of anchors x number of gt boxes
+        # anchors = xywh_to_xyxy(anchors)
+        # gt_boxes_perimg[:, :-1] = xywh_to_xyxy(gt_boxes_perimg[:, :-1])
         overlaps = box_overlap_opr(anchors, gt_boxes_perimg[:, :-1])
 
         # max_overlaps : 각 anchor와 gt box의 상위 2개의 IoU값
@@ -35,15 +37,15 @@ def retina_anchor_target_diou(anchors, gt_boxes, im_info, top_k=1):
         max_overlaps = max_overlaps.flatten()
         gt_assignment = gt_assignment.flatten()
 
-        # 
+        # gt_assignment : bbox에 할당할 gt box의 index 
         _, gt_assignment_for_gt = torch.max(overlaps, axis=0)
 
         del overlaps 
 
-        # positive label
+        # positive/negative label
         labels = gt_boxes_perimg[gt_assignment, 4]
         labels = labels * (max_overlaps >= config.negative_thresh)
-        
+
         # ignore label
         ignore_mask = (max_overlaps < config.positive_thresh) * (max_overlaps >= config.negative_thresh)
         labels[ignore_mask] = -1
@@ -54,14 +56,22 @@ def retina_anchor_target_diou(anchors, gt_boxes, im_info, top_k=1):
         # target_anchors shape: (number of anchors x 2) x 4 
         target_boxes = gt_boxes_perimg[gt_assignment, :4]
         target_anchors = anchors.repeat(1, top_k).reshape(-1, anchors.shape[-1])
+        # print(target_anchors[:5, :])
+        # print(target_boxes[:5, :])
+        if config.allow_low_quality:
+            labels[gt_assignment_for_gt] = gt_boxes_perimg[:, 4]
+            # low_quality_bbox_targets = bbox_transform_opr(anchors[gt_assignment_for_gt], gt_boxes_perimg[:, :4])
+            # bbox_targets[gt_assignment_for_gt] = low_quality_bbox_targets
+            target_boxes[gt_assignment_for_gt] = gt_boxes_perimg[:, :4]
 
-        # if config.allow_low_quality:
-        #     labels[gt_assignment_for_gt] = gt_boxes_perimg[:, 4]
-        #     low_quality_bbox_targets = bbox_transform_opr(anchors[gt_assignment_for_gt], gt_boxes_perimg[:, :4])
-        #     bbox_targets[gt_assignment_for_gt] = low_quality_bbox_targets
 
+        # labels shape : (-1, 2)
+        # target boxes shape : (-1, 8)
+        # target anchors : (-1, 8)
         labels = labels.reshape(-1, 1 * top_k)
         target_boxes = target_boxes.reshape(-1, 4 * top_k)
+        target_anchors = target_anchors.reshape(-1, 4 * top_k)
+
         return_labels.append(labels)
         return_bbox_targets.append(target_boxes)
         return_anchors.append(target_anchors)

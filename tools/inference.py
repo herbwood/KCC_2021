@@ -34,6 +34,7 @@ def inference(args, config, network):
     pred_boxes = post_process(pred_boxes, config, im_info[0, 2])
     pred_tags = pred_boxes[:, 5].astype(np.int32).flatten()
     pred_tags_name = np.array(config.class_names)[pred_tags]
+    
 
     # inplace draw
     image = visual_utils.draw_boxes(
@@ -45,7 +46,7 @@ def inference(args, config, network):
 
     name = args.img_path.split('/')[-1].split('.')[-2]
     fpath = 'outputs/{}.png'.format(name)
-
+    
     cv2.imwrite(fpath, image)
 
 

@@ -78,6 +78,8 @@ class RetinaNet_Criteria(nn.Module):
         all_pred_cls = all_pred_cls.reshape(-1, 2, config.num_classes-1)
         all_pred_reg = all_pred_reg.reshape(-1, 2, 4)
 
+        
+
         loss0 = emd_loss_focal(
                 all_pred_reg[:, 0], all_pred_cls[:, 0],
                 all_pred_reg[:, 1], all_pred_cls[:, 1],
@@ -179,20 +181,28 @@ def per_layer_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
     keep_anchors = torch.cat(keep_anchors, axis = 0)
     keep_cls = torch.cat(keep_cls, axis = 0)
     keep_reg = torch.cat(keep_reg, axis = 0)
+
     # multiclass
     tag = torch.arange(class_num).type_as(keep_cls)+1
     tag = tag.repeat(keep_cls.shape[0], 1).reshape(-1,1)
+
     pred_scores_0 = keep_cls[:, :class_num].reshape(-1, 1)
     pred_scores_1 = keep_cls[:, class_num:].reshape(-1, 1)
+
     pred_delta_0 = keep_reg[:, :4]
     pred_delta_1 = keep_reg[:, 4:]
+
     pred_bbox_0 = restore_bbox(keep_anchors, pred_delta_0, False)
     pred_bbox_1 = restore_bbox(keep_anchors, pred_delta_1, False)
+
     pred_bbox_0 = pred_bbox_0.repeat(1, class_num).reshape(-1, 4)
     pred_bbox_1 = pred_bbox_1.repeat(1, class_num).reshape(-1, 4)
+
     pred_bbox_0 = torch.cat([pred_bbox_0, pred_scores_0, tag], axis=1)
     pred_bbox_1 = torch.cat([pred_bbox_1, pred_scores_1, tag], axis=1)
+
     pred_bbox = torch.cat((pred_bbox_0, pred_bbox_1), axis=1)
+
     return pred_bbox
 
 def union_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
@@ -201,20 +211,27 @@ def union_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
     pred_cls = torch.sigmoid(pred_cls)
     pred_reg = torch.cat(pred_reg_list, axis = 1)[0]
     class_num = pred_cls.shape[-1] // 2
+
     # multiclass
     tag = torch.arange(class_num).type_as(pred_cls)+1
     tag = tag.repeat(pred_cls.shape[0], 1).reshape(-1,1)
+
     pred_scores_0 = pred_cls[:, :class_num].reshape(-1, 1)
     pred_scores_1 = pred_cls[:, class_num:].reshape(-1, 1)
+
     pred_delta_0 = pred_reg[:, :4]
     pred_delta_1 = pred_reg[:, 4:]
+
     pred_bbox_0 = restore_bbox(anchors, pred_delta_0, False)
     pred_bbox_1 = restore_bbox(anchors, pred_delta_1, False)
+
     pred_bbox_0 = pred_bbox_0.repeat(1, class_num).reshape(-1, 4)
     pred_bbox_1 = pred_bbox_1.repeat(1, class_num).reshape(-1, 4)
+
     pred_bbox_0 = torch.cat([pred_bbox_0, pred_scores_0, tag], axis=1)
     pred_bbox_1 = torch.cat([pred_bbox_1, pred_scores_1, tag], axis=1)
     pred_bbox = torch.cat((pred_bbox_0, pred_bbox_1), axis=1)
+
     return pred_bbox
 
 def restore_bbox(rois, deltas, unnormalize=True):
