@@ -191,7 +191,7 @@ def per_layer_inference(anchors_list, pred_cls_list, pred_reg_list, im_info):
 
     pred_delta_0 = keep_reg[:, :4]
     pred_delta_1 = keep_reg[:, 4:]
-
+    
     pred_bbox_0 = restore_bbox(keep_anchors, pred_delta_0, False)
     pred_bbox_1 = restore_bbox(keep_anchors, pred_delta_1, False)
 

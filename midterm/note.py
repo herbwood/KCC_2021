@@ -83,6 +83,6 @@ def xywh_to_xyxy(boxes):
 #     train_id_list.append(train_records[i]["ID"])
 # print(train_id_list)
 
-output = torch.exp(torch.tensor(1, 2), 1)
-print(output)
+input = torch.randn((10, 4))
+input.any()
 

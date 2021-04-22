@@ -378,9 +378,8 @@ def bbox_overlaps_diou(bboxes1, bboxes2):
 
     iou = inter_area / union
     center_distance = inter_diag / outer_diag
-    # print(iou)
-    # print("IoU average :", torch.mean(iou))
-    # print("Center Distance :", torch.mean(center_distance))
+    print("IoU average :", torch.mean(iou))
+    print("Center Distance :", torch.mean(center_distance))
 
     dious = (inter_area / union) - ((inter_diag) / outer_diag)
     dious = torch.clamp(dious,min=-1.0,max = 1.0)
@@ -391,8 +390,7 @@ def bbox_overlaps_diou(bboxes1, bboxes2):
 
 def simple_diou_loss(pred_delta, targets, anchors):
 
-    bboxes = bbox_with_delta(pred_delta, anchors)
-    print(bboxes)
+    bboxes = bbox_with_delta(anchors, pred_delta)
     dious = bbox_overlaps_diou(bboxes, targets)
 
     dious = dious.reshape(-1, 1)
