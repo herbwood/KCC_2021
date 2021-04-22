@@ -133,16 +133,28 @@ def emd_loss_focal(p_b0, p_s0, p_b1, p_s1, targets, labels):
 
     return loss
 
+#####################Repulsion DIoU loss####################################
 
 
-def diou_overlap(delta, anchors, bboxes2, get_iou=True, epsilon=5e-10, mask=None):
+def bbox_with_delta(rois, deltas, unnormalize=True):
+    # if unnormalize:
+    #     std_opr = torch.tensor(config.bbox_normalize_stds[None, :]).type_as(deltas)
+    #     mean_opr = torch.tensor(config.bbox_normalize_means[None, :]).type_as(deltas)
+    #     deltas = deltas * std_opr + mean_opr
+
+    pred_bbox = bbox_transform_inv_opr(rois, deltas)
+
+    return pred_bbox
+
+
+def repulsion_diou_overlap(delta, anchors, bboxes2, get_iou=True, epsilon=5e-10, mask=None):
     
     # anchor boxes 
-    bboxes1 = bbox_with_delta(delta, anchors)
+    bboxes1 = bbox_with_delta(anchors, delta)
 
     if isinstance(bboxes2, tuple):
         bbox2_delta, bbox2_anchor = bboxes2
-        bboxes2 = bbox_with_delta(bbox2_delta, bbox2_anchor)
+        bboxes2 = bbox_with_delta(bbox2_anchor, bbox2_delta)
 
     rows = bboxes1.shape[0]
     cols = bboxes2.shape[0]
@@ -236,75 +248,63 @@ def repulsion_diou_loss(pred_delta, anchors, targets, alpha=0.5, beta=0.5):
     max_gt_overlaps, gt_assignment = second_gt_overlaps.topk(2, dim=1, sorted=True)
     second_matched_gt_iou, second_gt_indices = max_gt_overlaps[:, 1], gt_assignment[:, 1]
     # second_gt_mask = torch.where(second_matched_gt_iou > 0, 1, 0).cuda()
-    second_gt_mask = (second_matched_gt_iou > 0).flatten()
+    second_gt_mask = (second_matched_gt_iou > 0).flatten().cuda()
 
     # Repulsion term 2
     # between bbox and bboxes with different target
     # Returns :
     # second_bbox_indices : second bbox indices
     # second_bbox_mask : whether iou > 0, whether assigned to same gt box or not 
-    # second_bbox_overlaps = box_overlap_opr(anchors, anchors)
-    # max_bbox_overlaps, bbox_assignment = second_bbox_overlaps.topk(2, dim=1, sorted=True)
-    # second_matched_bbox_iou, second_bbox_indices = max_bbox_overlaps[:, 1], bbox_assignment[:, 1]
-    # # second_bbox_iou_mask = torch.where(second_matched_bbox_iou > 0, 1, 0)
-    # second_bbox_iou_mask = (second_matched_bbox_iou > 0).flatten()
-    # second_bbox_gt_mask = torch.all(targets != targets[second_bbox_indices], dim=1).int()
-    # second_bbox_mask = second_bbox_iou_mask.cuda() * second_bbox_gt_mask.cuda()
+    second_bbox_overlaps = box_overlap_opr(anchors, anchors)
+    max_bbox_overlaps, bbox_assignment = second_bbox_overlaps.topk(2, dim=1, sorted=True)
+    second_matched_bbox_iou, second_bbox_indices = max_bbox_overlaps[:, 1], bbox_assignment[:, 1]
+    # second_bbox_iou_mask = torch.where(second_matched_bbox_iou > 0, 1, 0)
+    second_bbox_iou_mask = (second_matched_bbox_iou > 0).flatten()
+    second_bbox_gt_mask = torch.all(targets != targets[second_bbox_indices], dim=1).int()
+    second_bbox_mask = second_bbox_iou_mask.cuda() * second_bbox_gt_mask.cuda()
 
     first_gt_mask = torch.ones(anchors.shape[0]).cuda()
 
     # bbox_gt1_diou : bbox and target gt box iou and center distance, shape : (number of boxes, 1)
     # bbox_gt2_diou : bbox and non target gt box center distance, shape : (number of boxes, 1)
     # bbox_bbox2_diou : bbox and 2nd bbox center distance , shape : (number of boxes, 1)
-    bbox_gt1_diou = diou_overlap(pred_delta, anchors, targets, get_iou=True, mask=first_gt_mask)
-    bbox_gt2_diou = diou_overlap(pred_delta, anchors, targets[second_gt_indices], get_iou=False, mask=second_gt_mask)
-    # bbox_bbox2_diou = diou_overlap(pred_delta, anchors, (pred_delta[second_bbox_indices], anchors[second_bbox_indices]), 
-    #                                 get_iou=False, mask=second_bbox_mask)   
+    bbox_gt1_diou = repulsion_diou_overlap(pred_delta, anchors, targets, get_iou=True, mask=first_gt_mask)
+    bbox_gt2_diou = repulsion_diou_overlap(pred_delta, anchors, targets[second_gt_indices], get_iou=False, mask=second_gt_mask)
+    bbox_bbox2_diou = repulsion_diou_overlap(pred_delta, anchors, (pred_delta[second_bbox_indices], anchors[second_bbox_indices]), 
+                                    get_iou=False, mask=second_bbox_mask)   
 
-    # dious = bbox_gt1_diou + alpha * bbox_gt2_diou + beta * bbox_bbox2_diou
-    dious = bbox_gt1_diou + alpha * bbox_gt2_diou
-    dious = torch.clamp(dious, min=-10.0, max=10.0) 
+    dious = bbox_gt1_diou + alpha * bbox_gt2_diou + beta * bbox_bbox2_diou
+    # dious = bbox_gt1_diou + alpha * bbox_gt2_diou
+    # dious = torch.clamp(dious, min=-10.0, max=10.0) 
 
     dious = dious.reshape(-1, 1)
     loss = 1.0 - dious
     loss = loss.sum(axis=1)
 
     del second_gt_overlaps 
-    # del second_bbox_overlaps 
+    del second_bbox_overlaps 
 
     return loss 
 
 
-def emd_loss_diou(p_b0, p_s0, p_b1, p_s1, targets, labels, anchors):
-    # p_b0 shape : (anchors, 4)
-    # p_s0 shape : (anchors, 1)
-    # p_b1 shape : (anchors, 4)
-    # p_s1 shape : (anchors, 1)
-    # targets shape : (anchors, 8)
-    # labels shape : (anchors, 2)
-    # anchors shape : (anchors, 8)
+def emd_loss_repulsion_diou(p_b0, p_s0, p_b1, p_s1, targets, labels, anchors):
 
-    # pred delta shape : (anchors * 2, 4)
-    # pred score shape : (anchors * 2, 1)
     pred_delta = torch.cat([p_b0, p_b1], axis=1).reshape(-1, p_b0.shape[-1])
     pred_score = torch.cat([p_s0, p_s1], axis=1).reshape(-1, p_s0.shape[-1]) 
 
-    labels = labels.long().reshape(-1, 1)
-
-    anchors = anchors.reshape(-1, 4)
     targets = targets.reshape(-1, 4)
+    labels = labels.long().reshape(-1, 1)
+    anchors = anchors.reshape(-1, 4)
 
     # valid mask : positive/negative label mask(True or False)
     # valid mask shape : (-1, 1)
     valid_mask = (labels >= 0).flatten()
-    # valid_mask = valid_mask.cuda()
     objectness_loss = focal_loss(pred_score, labels, config.focal_loss_alpha, config.focal_loss_gamma)
 
     # fg_masks : positive label mask(True or False)
     fg_masks = (labels > 0).flatten()
-    # fg_masks = fg_masks.cuda()
 
-    localization_loss = repulsion_diou_loss(pred_delta[fg_masks], anchors[fg_masks], targets[fg_masks], alpha=0.5, beta=0.1)
+    localization_loss = repulsion_diou_loss(pred_delta[fg_masks], anchors[fg_masks], targets[fg_masks], alpha=0.5, beta=0.5)
 
     # objectness_loss = objectness_loss.cuda()
     # localization_loss = localization_loss.cuda()
@@ -322,18 +322,6 @@ def emd_loss_diou(p_b0, p_s0, p_b1, p_s1, targets, labels, anchors):
 
 
     ####################Simple DIOU###########################
-    
-
-def bbox_with_delta(rois, deltas, unnormalize=True):
-    # if unnormalize:
-    #     std_opr = torch.tensor(config.bbox_normalize_stds[None, :]).type_as(deltas)
-    #     mean_opr = torch.tensor(config.bbox_normalize_means[None, :]).type_as(deltas)
-    #     deltas = deltas * std_opr + mean_opr
-
-    pred_bbox = bbox_transform_inv_opr(rois, deltas)
-
-    return pred_bbox
-
 
 def bbox_overlaps_diou(bboxes1, bboxes2):
     
@@ -378,8 +366,8 @@ def bbox_overlaps_diou(bboxes1, bboxes2):
 
     iou = inter_area / union
     center_distance = inter_diag / outer_diag
-    print("IoU average :", torch.mean(iou))
-    print("Center Distance :", torch.mean(center_distance))
+    # print("IoU average :", torch.mean(iou))
+    # print("Center Distance :", torch.mean(center_distance))
 
     dious = (inter_area / union) - ((inter_diag) / outer_diag)
     dious = torch.clamp(dious,min=-1.0,max = 1.0)

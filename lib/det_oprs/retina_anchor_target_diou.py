@@ -17,6 +17,7 @@ def retina_anchor_target_diou(anchors, gt_boxes, im_info, top_k=1):
         
         gt_boxes_perimg = gt_boxes[bid, :int(im_info[bid, 5]), :]
         anchors = anchors.type_as(gt_boxes_perimg)
+        
 
         # IoU between bbox and gt box
         # number of anchors x number of gt boxes
